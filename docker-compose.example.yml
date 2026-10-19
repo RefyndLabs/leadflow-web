@@ -1,0 +1,30 @@
+# Example: run the web container next to the API on the same VPS (see FRONTEND_BUILD_GUIDE.md §11).
+# Copy the `web` service into deploy/docker-compose.yml of the API repo, or run it standalone.
+#
+#   docker compose -f docker-compose.example.yml --env-file .env up --build
+#
+# Put the frontend on the API's private `backend` network and call http://api:8000 directly:
+# no extra TLS hop and the API is never exposed to browsers. Terminate TLS for the web app in Caddy.
+services:
+  web:
+    build:
+      context: .
+      args:
+        NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
+    restart: unless-stopped
+    environment:
+      API_URL: http://api:8000 # private network name of the API service
+      SESSION_SECRET: ${SESSION_SECRET:?generate one: openssl rand -base64 48}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+    read_only: true
+    tmpfs: [/tmp, /app/.next/cache]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    ports:
+      - "127.0.0.1:3000:3000" # Caddy reverse-proxies to this; not exposed publicly
+    networks: [backend]
+
+networks:
+  backend:
+    external: true # the API stack's private network (name it to match deploy/docker-compose.yml)
