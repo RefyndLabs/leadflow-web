@@ -157,6 +157,7 @@ describe("enums match the API", () => {
       "catalog:write",
       "events:write",
       "cadences:write",
+      "captures:write",
     ]) {
       expect(
         (GRANTABLE_KEY_SCOPES as readonly string[]).includes(humanOnly),

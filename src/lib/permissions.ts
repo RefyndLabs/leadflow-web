@@ -19,6 +19,8 @@ export const GRANTABLE_KEY_SCOPES = [
   "catalog:read",
   "events:read",
   "cadences:read",
+  "captures:process",
+  "research:process",
 ] as const satisfies readonly Permission[];
 
 /** Plain-language description of each grantable scope, for the key picker. */
@@ -41,6 +43,10 @@ export const SCOPE_HELP: Record<(typeof GRANTABLE_KEY_SCOPES)[number], string> =
     "catalog:read": "Read products, catalogue, FAQs and collateral",
     "events:read": "Read exhibitions",
     "cadences:read": "Read follow-up rules and what's due",
+    "captures:process":
+      "Read show captures and report the extraction (capture workflow)",
+    "research:process":
+      "Claim lead research and post results (research workflow)",
   };
 
 /** Permission checks always go through the live `permissions` array, never the role string. */
