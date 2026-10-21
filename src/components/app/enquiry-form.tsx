@@ -142,6 +142,7 @@ export function EnquiryForm({
     contact_email: defaults?.contact_email ?? "",
     contact_designation: defaults?.contact_designation ?? "",
     contact_whatsapp: "",
+    contact_alternate_phone: "",
     account_name: defaults?.account_name ?? "",
     account_domain: "",
     account_industry: "",
@@ -343,6 +344,19 @@ export function EnquiryForm({
                   autoComplete="off"
                   maxLength={50}
                   {...form.register("contact_whatsapp")}
+                />
+              </Field>
+              <Field
+                label="Alternate number"
+                hint="Only if they gave a second number."
+                error={errors.contact_alternate_phone?.message as string | undefined}
+              >
+                <Input
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="off"
+                  maxLength={50}
+                  {...form.register("contact_alternate_phone")}
                 />
               </Field>
             </div>

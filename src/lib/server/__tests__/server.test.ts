@@ -44,6 +44,22 @@ describe("gateway allow-list", () => {
     ],
     [["leads", "overview"], "/leads/overview"],
     [["events", "current"], "/events/current"],
+    [
+      ["leads", "3f2c1e9a-1111-4222-8333-444455556666", "first-touch"],
+      "/leads/3f2c1e9a-1111-4222-8333-444455556666/first-touch",
+    ],
+    [
+      ["outreach", "3f2c1e9a-1111-4222-8333-444455556666"],
+      "/outreach/3f2c1e9a-1111-4222-8333-444455556666",
+    ],
+    [
+      ["outreach", "3f2c1e9a-1111-4222-8333-444455556666", "approve"],
+      "/outreach/3f2c1e9a-1111-4222-8333-444455556666/approve",
+    ],
+    [
+      ["outreach", "3f2c1e9a-1111-4222-8333-444455556666", "mark-sent"],
+      "/outreach/3f2c1e9a-1111-4222-8333-444455556666/mark-sent",
+    ],
   ])("allows %j", (segs, target) => expect(resolveTarget(segs)).toBe(target));
 
   it.each([
@@ -56,6 +72,14 @@ describe("gateway allow-list", () => {
     [["research"]],
     [["research", "3f2c1e9a-1111-4222-8333-444455556666", "claim"]],
     [["research", "3f2c1e9a-1111-4222-8333-444455556666", "result"]],
+    // The first-message queue and the workflow's verbs are n8n's (outreach:process).
+    [["outreach"]],
+    [["outreach", "3f2c1e9a-1111-4222-8333-444455556666", "claim"]],
+    [["outreach", "3f2c1e9a-1111-4222-8333-444455556666", "context"]],
+    [["outreach", "3f2c1e9a-1111-4222-8333-444455556666", "draft"]],
+    [["outreach", "3f2c1e9a-1111-4222-8333-444455556666", "sent"]],
+    [["outreach", "3f2c1e9a-1111-4222-8333-444455556666", "fail"]],
+    [["outreach", "3f2c1e9a-1111-4222-8333-444455556666", "approve", "x"]],
     [["auth", "refresh"]],
     [["auth", "logout"]],
     [["health"]],

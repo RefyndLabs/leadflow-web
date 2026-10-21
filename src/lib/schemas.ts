@@ -333,6 +333,7 @@ export const contactCreate = z
     email: optionalEmail,
     designation: text(300),
     whatsapp: optionalPhone,
+    alternate_phone: optionalPhone,
     account_id: optionalUuid,
   })
   .refine(phoneOrEmail("phone", "email"), {
@@ -346,6 +347,7 @@ export const contactUpdate = z
     email: optionalEmailNull,
     designation: textNull(300),
     whatsapp: optionalPhoneNull.optional(),
+    alternate_phone: optionalPhoneNull.optional(),
     account_id: optionalUuidNull,
   })
   .refine(phoneOrEmail("phone", "email"), {
@@ -445,6 +447,7 @@ export const leadIngest = z
     contact_email: optionalEmail,
     contact_designation: text(300),
     contact_whatsapp: optionalPhone,
+    contact_alternate_phone: optionalPhone,
     account_name: req(300, "Company name"),
     account_domain: text(300),
     account_industry: text(300),
@@ -666,6 +669,7 @@ export const captureConfirm = z
     contact_email: optionalEmail,
     contact_designation: text(300),
     contact_whatsapp: optionalPhone,
+    contact_alternate_phone: optionalPhone,
     account_name: req(300, "Company name"),
     account_domain: text(300),
     account_industry: text(300),
@@ -687,6 +691,7 @@ export const captureConfirm = z
     event_id: optionalUuidNull.optional(),
     content: text(20000),
     request_research: z.boolean().optional(),
+    request_first_touch: z.boolean().optional(),
     ...exportDetails,
   })
   .refine(phoneOrEmail("contact_phone", "contact_email"), {
@@ -763,6 +768,7 @@ export const organizationUpdate = z.strictObject({
   business_description: textNull(4000).optional(),
   website: optionalWebsiteNull().optional(),
   auto_research_new_leads: z.boolean().optional(),
+  first_touch_auto_send: z.boolean().optional(),
 });
 
 export const researchRequest = z.strictObject({

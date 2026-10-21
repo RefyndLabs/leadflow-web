@@ -31,6 +31,18 @@ const PROCESS_ONLY = new Set([
   "fail",
 ]);
 
+/**
+ * The first-message actions a person takes on `/outreach/{id}`. The queue itself and claim, context,
+ * draft, sent and fail are n8n's (outreach:process), so the gateway refuses them.
+ */
+const OUTREACH_ACTIONS = new Set([
+  "approve",
+  "mark-sent",
+  "redraft",
+  "retry",
+  "cancel",
+]);
+
 /** /auth/* endpoints the browser may call there (login/refresh/logout have dedicated routes). */
 const AUTH_ALLOWED = new Set(["me", "change-password"]);
 
@@ -40,6 +52,11 @@ export function resolveTarget(segments: string[]): string | null {
   const [head, second] = segments;
   if (head === "auth")
     return segments.length === 2 && AUTH_ALLOWED.has(second!)
+      ? `/${segments.join("/")}`
+      : null;
+  if (head === "outreach")
+    return segments.length === 2 ||
+      (segments.length === 3 && OUTREACH_ACTIONS.has(segments[2]!))
       ? `/${segments.join("/")}`
       : null;
   if (segments.some((s) => PROCESS_ONLY.has(s))) return null;

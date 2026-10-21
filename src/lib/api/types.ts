@@ -53,6 +53,8 @@ export type LeadNoteCreate = S["LeadNoteCreate"];
 export type LeadProduct = S["LeadProductRead"];
 export type LeadProductIn = S["LeadProductIn"];
 export type Research = S["ResearchRead"];
+export type Outreach = S["OutreachRead"];
+export type OutreachDraft = S["OutreachDraft"];
 export type ResearchResult = S["ResearchResult"];
 export type ProductMatch = S["ProductMatchRead"];
 
@@ -76,6 +78,7 @@ export type ContactChannel = S["ContactChannel"];
 export type LeadNoteKind = S["LeadNoteKind"];
 export type LeadProductSource = S["LeadProductSource"];
 export type ResearchStatus = S["ResearchStatus"];
+export type OutreachStatus = S["OutreachStatus"];
 
 /** `/leads/stats` is untyped in the OpenAPI snapshot; this is the shape documented in the build guide. */
 export interface LeadStats {

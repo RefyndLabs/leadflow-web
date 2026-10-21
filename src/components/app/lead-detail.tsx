@@ -72,6 +72,8 @@ import { PageHeader } from "./page-header";
 import { PipelineRail } from "./pipeline-rail";
 import { EventOptions, FormSelect, UserOptions } from "./pickers";
 import { QualificationPanel } from "./qualification";
+import { FirstTouchCard } from "./first-touch";
+import { SaveContactButton } from "./save-contact";
 import { FromTheShow } from "./transcript";
 import { cardSideLabels } from "./card-photos";
 
@@ -457,9 +459,11 @@ const mailHref = (e: string) =>
 function ContactCard({
   contact,
   account,
+  event,
 }: {
   contact: ContactBrief;
   account: Account | null;
+  event: EventBrief | null;
 }) {
   const site = safeHttpUrl(account?.website);
   const country = account?.country;
@@ -525,6 +529,19 @@ function ContactCard({
               </a>
             </Button>
           )}
+          <SaveContactButton
+            card={{
+              name: contact.name,
+              phone: contact.phone,
+              alternatePhone: contact.alternate_phone,
+              whatsapp: contact.whatsapp,
+              email: contact.email,
+              company: account?.name,
+              title: contact.designation,
+              website: site,
+              note: event ? `Met at ${event.name}` : null,
+            }}
+          />
         </div>
         <dl className="divide-y divide-line border-t border-line">
           <Row label="Email">
@@ -540,7 +557,7 @@ function ContactCard({
             {contact.phone ? formatPhone(contact.phone) : <Dash />}
           </Row>
           <Row label="WhatsApp">
-            {contact.whatsapp ? (
+            {contact.whatsapp && contact.whatsapp !== contact.phone ? (
               formatPhone(contact.whatsapp)
             ) : contact.phone ? (
               <span className="text-muted">Same as phone</span>
@@ -548,6 +565,13 @@ function ContactCard({
               <Dash />
             )}
           </Row>
+          {contact.alternate_phone && (
+            <Row label="Alternate number">
+              <a href={telHref(contact.alternate_phone)} className="text-accent hover:underline">
+                {formatPhone(contact.alternate_phone)}
+              </a>
+            </Row>
+          )}
           <Row label="Website">
             {site ? (
               <a
@@ -634,7 +658,7 @@ export function LeadDetail({ id }: { id: string }) {
     );
   }
 
-  const { lead, contact, account, event, owner, products, notes, touchpoints, captures, research } = q.data;
+  const { lead, contact, account, event, owner, products, notes, touchpoints, captures, research, outreach } = q.data;
   const closed = lead.status === "won" || lead.status === "lost";
   const canWrite = can("leads:write");
   const showCapture = captures.find((c) => c.card || c.card_back || c.voice || c.extracted);
@@ -713,6 +737,13 @@ export function LeadDetail({ id }: { id: string }) {
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="order-2 min-w-0 space-y-4 lg:order-1">
+          <FirstTouchCard
+            leadId={lead.id}
+            run={outreach}
+            contact={contact}
+            canWrite={canWrite}
+            closed={closed}
+          />
           <QualificationPanel lead={lead} research={research} canWrite={canWrite} />
           <NotesPanel leadId={lead.id} notes={notes} canWrite={canWrite} />
           <Tabs defaultValue="conversation">
@@ -752,7 +783,7 @@ export function LeadDetail({ id }: { id: string }) {
         </div>
 
         <div className="order-1 space-y-4 lg:order-2">
-          <ContactCard contact={contact} account={account} />
+          <ContactCard contact={contact} account={account} event={event} />
           <ActionsCard lead={lead} />
           <Card>
             <CardHeader>

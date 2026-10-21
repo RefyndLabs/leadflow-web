@@ -660,8 +660,8 @@ export interface paths {
          * Get Lead Context
          * @description Everything the lead page shows: the lead (with export details and AI
          *     qualification), contact, company, exhibition, owner, products, notes,
-         *     messages, the show capture it came from (photo, voice note, transcript)
-         *     and the newest research.
+         *     messages, the show capture it came from (photo, voice note, transcript),
+         *     the newest research and the newest first message.
          */
         get: operations["get_lead_context_leads__lead_id__context_get"];
         put?: never;
@@ -815,6 +815,50 @@ export interface paths {
          *     a new request). Requires `leads:write`.
          */
         post: operations["request_research_leads__lead_id__research_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/leads/{lead_id}/first-touch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request First Touch
+         * @description Asks for a personalised first message to this lead (written by the
+         *     writing workflow from the voice note, typed note, card, products and
+         *     promises; approved on the lead page). One in progress is returned as it is
+         *     (`200`); so is one already sent or cancelled, unless `again` is true (`201`
+         *     for a new one). Requires `leads:write`.
+         */
+        post: operations["request_first_touch_leads__lead_id__first_touch_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/leads/{lead_id}/outreach": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Lead Outreach
+         * @description Every first message for this lead, newest first.
+         */
+        get: operations["list_lead_outreach_leads__lead_id__outreach_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1036,7 +1080,8 @@ export interface paths {
          * Confirm Capture
          * @description A person has reviewed the details: create the lead (same matching and
          *     lead-resolution rules as POST /leads/ingest), record the first message, and
-         *     attach the card photo(s) and voice note to it.
+         *     attach the card photo(s) and voice note to it. For a new lead, a
+         *     personalised first message to the buyer is queued too (`request_first_touch`).
          *
          *     With an exhibition the lead's source is `exhibition`; without one (met at an
          *     office, a factory, a walk-in) it is `in_person`. `event_id` omitted = keep the
@@ -1816,6 +1861,265 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/outreach": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Outreach
+         * @description First messages; `?status=requested` is the writing queue and
+         *     `?status=approved` the sending queue (oldest first by default).
+         */
+        get: operations["list_outreach_outreach_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/outreach/{outreach_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Outreach */
+        get: operations["get_outreach_outreach__outreach_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Edit Outreach
+         * @description Saves edits to the draft (WhatsApp text, email subject and body).
+         */
+        patch: operations["edit_outreach_outreach__outreach_id__patch"];
+        trace?: never;
+    };
+    "/outreach/{outreach_id}/claim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Claim Outreach
+         * @description Takes a `requested` one to write (-> `drafting`) or an `approved` one to
+         *     send (-> `sending`). `409` if someone else has it. An unfinished writing
+         *     claim is handed out again after CAPTURE_PROCESSING_LEASE_MINUTES; a sending
+         *     claim never is.
+         */
+        post: operations["claim_outreach_outreach__outreach_id__claim_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/outreach/{outreach_id}/context": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Outreach Context
+         * @description Everything the writer should be given, and what the sender needs:
+         *     the lead with its export details, the contact, the company, the exhibition,
+         *     the products (and our catalogue), every note (the conversation summary and
+         *     what we promised), the show capture (typed note, card text, the voice note's
+         *     transcript and its English translation, the conversation write-up), the
+         *     messages so far, the newest research, who is sending it, who we are, the
+         *     person's instructions, the writing rules, the limits, the JSON schema of the
+         *     draft, and the delivery details (numbers, address, WhatsApp 24-hour window).
+         */
+        get: operations["outreach_context_outreach__outreach_id__context_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/outreach/{outreach_id}/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Submit Draft
+         * @description The written draft for a claimed one (-> `draft_ready`, or straight to
+         *     `approved` when the organization sends first messages automatically). `409`
+         *     if it was cancelled meanwhile: drop it.
+         */
+        post: operations["submit_draft_outreach__outreach_id__draft_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/outreach/{outreach_id}/sent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Report Sent
+         * @description It went out (-> `sent`): logged on the lead as an outbound message, which
+         *     moves an uncontacted lead into conversation.
+         */
+        post: operations["report_sent_outreach__outreach_id__sent_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/outreach/{outreach_id}/fail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Fail Outreach
+         * @description Writing or sending did not work (-> `failed`); a person can retry, rewrite or send it by hand.
+         */
+        post: operations["fail_outreach_outreach__outreach_id__fail_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/outreach/{outreach_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve Outreach
+         * @description Approves the draft, with any last edits (-> `approved`): the sending
+         *     workflow sends it on `channel`. A person only.
+         */
+        post: operations["approve_outreach_outreach__outreach_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/outreach/{outreach_id}/mark-sent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark Sent
+         * @description The person sent it themselves (from their own WhatsApp or mailbox, with
+         *     any edits): logged on the lead as sent (-> `sent`). Not once a workflow is
+         *     sending it. A person only.
+         */
+        post: operations["mark_sent_outreach__outreach_id__mark_sent_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/outreach/{outreach_id}/redraft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Redraft Outreach
+         * @description Writes it again, with optional guidance (-> `requested`).
+         */
+        post: operations["redraft_outreach_outreach__outreach_id__redraft_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/outreach/{outreach_id}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retry Outreach
+         * @description After a failure: writes it again (no draft yet) or sends the approved
+         *     message again. Also unsticks a send that never reported back.
+         */
+        post: operations["retry_outreach_outreach__outreach_id__retry_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/outreach/{outreach_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel Outreach
+         * @description Gives up on it (-> `cancelled`). Not while it is being sent.
+         */
+        post: operations["cancel_outreach_outreach__outreach_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2178,6 +2482,8 @@ export interface components {
             contact_designation?: string | null;
             /** Contact Whatsapp */
             contact_whatsapp?: string | null;
+            /** Contact Alternate Phone */
+            contact_alternate_phone?: string | null;
             /** Account Name */
             account_name?: string | null;
             /** Account Domain */
@@ -2217,6 +2523,8 @@ export interface components {
             content?: string | null;
             /** Request Research */
             request_research?: boolean | null;
+            /** Request First Touch */
+            request_first_touch?: boolean | null;
         };
         /**
          * CaptureConfirmRequest
@@ -2255,6 +2563,8 @@ export interface components {
             contact_designation?: string | null;
             /** Contact Whatsapp */
             contact_whatsapp?: string | null;
+            /** Contact Alternate Phone */
+            contact_alternate_phone?: string | null;
             /** Account Name */
             account_name: string;
             /** Account Domain */
@@ -2301,6 +2611,11 @@ export interface components {
              * @default true
              */
             request_research: boolean;
+            /**
+             * Request First Touch
+             * @default true
+             */
+            request_first_touch: boolean;
         };
         /** CaptureConfirmResponse */
         CaptureConfirmResponse: {
@@ -2313,6 +2628,8 @@ export interface components {
             redirect_lead_id: string;
             /** Research Id */
             research_id?: string | null;
+            /** Outreach Id */
+            outreach_id?: string | null;
         };
         /** CaptureCreate */
         CaptureCreate: {
@@ -2384,6 +2701,8 @@ export interface components {
             contact_phone_e164: string | null;
             /** Contact Whatsapp E164 */
             contact_whatsapp_e164: string | null;
+            /** Contact Alternate Phone E164 */
+            contact_alternate_phone_e164?: string | null;
             /** Phone Country */
             phone_country: string | null;
             /** Warnings */
@@ -2497,6 +2816,8 @@ export interface components {
             email: string | null;
             /** Whatsapp */
             whatsapp?: string | null;
+            /** Alternate Phone */
+            alternate_phone?: string | null;
             /** Designation */
             designation?: string | null;
         };
@@ -2603,6 +2924,8 @@ export interface components {
             designation?: string | null;
             /** Whatsapp */
             whatsapp?: string | null;
+            /** Alternate Phone */
+            alternate_phone?: string | null;
             /** Account Id */
             account_id?: string | null;
         };
@@ -2634,6 +2957,8 @@ export interface components {
             designation: string | null;
             /** Whatsapp */
             whatsapp?: string | null;
+            /** Alternate Phone */
+            alternate_phone?: string | null;
             /** Account Id */
             account_id: string | null;
             /**
@@ -2662,6 +2987,8 @@ export interface components {
             designation?: string | null;
             /** Whatsapp */
             whatsapp?: string | null;
+            /** Alternate Phone */
+            alternate_phone?: string | null;
             /** Account Id */
             account_id?: string | null;
         };
@@ -2998,6 +3325,8 @@ export interface components {
             contact_designation?: string | null;
             /** Contact Whatsapp */
             contact_whatsapp?: string | null;
+            /** Contact Alternate Phone */
+            contact_alternate_phone?: string | null;
             /** Account Name */
             account_name?: string | null;
             /** Account Domain */
@@ -3122,6 +3451,7 @@ export interface components {
             /** Captures */
             captures: components["schemas"]["CaptureRead"][];
             research: components["schemas"]["ResearchRead"] | null;
+            outreach?: components["schemas"]["OutreachRead"] | null;
             /**
              * Last Activity At
              * Format: date-time
@@ -3232,6 +3562,8 @@ export interface components {
             contact_designation?: string | null;
             /** Contact Whatsapp */
             contact_whatsapp?: string | null;
+            /** Contact Alternate Phone */
+            contact_alternate_phone?: string | null;
             /** Account Name */
             account_name: string;
             /** Account Domain */
@@ -3822,6 +4154,8 @@ export interface components {
             website?: string | null;
             /** Auto Research New Leads */
             auto_research_new_leads?: boolean | null;
+            /** First Touch Auto Send */
+            first_touch_auto_send?: boolean | null;
         };
         /**
          * OrganizationUpdate
@@ -3844,12 +4178,186 @@ export interface components {
             website?: string | null;
             /** Auto Research New Leads */
             auto_research_new_leads?: boolean | null;
+            /** First Touch Auto Send */
+            first_touch_auto_send?: boolean | null;
         };
+        /**
+         * OutreachApprove
+         * @description Approve the (optionally edited) draft: a workflow sends it on `channel`.
+         */
+        OutreachApprove: {
+            /** Whatsapp Text */
+            whatsapp_text?: string | null;
+            /** Email Subject */
+            email_subject?: string | null;
+            /** Email Body */
+            email_body?: string | null;
+            /**
+             * Channel
+             * @enum {string}
+             */
+            channel: "whatsapp" | "email";
+        };
+        /**
+         * OutreachDraft
+         * @description What the writing workflow posts: the message in both forms, in the
+         *     buyer's language, built only on what we actually know about them.
+         */
+        OutreachDraft: {
+            /** Whatsapp Text */
+            whatsapp_text?: string | null;
+            /** Email Subject */
+            email_subject?: string | null;
+            /** Email Body */
+            email_body?: string | null;
+            /** Suggested Channel */
+            suggested_channel?: ("whatsapp" | "email") | null;
+            /** Language */
+            language?: string | null;
+            /** Personalised On */
+            personalised_on?: string[];
+            /** Review Notes */
+            review_notes?: string[];
+        };
+        /** OutreachDraftSubmit */
+        OutreachDraftSubmit: {
+            draft: components["schemas"]["OutreachDraft"];
+        };
+        /**
+         * OutreachEdit
+         * @description A person's edits to the draft before approving it.
+         */
+        OutreachEdit: {
+            /** Whatsapp Text */
+            whatsapp_text?: string | null;
+            /** Email Subject */
+            email_subject?: string | null;
+            /** Email Body */
+            email_body?: string | null;
+        };
+        /** OutreachFailure */
+        OutreachFailure: {
+            /** Error */
+            error: string;
+        };
+        /**
+         * OutreachManualSend
+         * @description The person sent it themselves (from their own WhatsApp or mailbox).
+         */
+        OutreachManualSend: {
+            /** Whatsapp Text */
+            whatsapp_text?: string | null;
+            /** Email Subject */
+            email_subject?: string | null;
+            /** Email Body */
+            email_body?: string | null;
+            /**
+             * Channel
+             * @enum {string}
+             */
+            channel: "whatsapp" | "email";
+        };
+        /** OutreachRead */
+        OutreachRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Lead Id
+             * Format: uuid
+             */
+            lead_id: string;
+            status: components["schemas"]["OutreachStatus"];
+            /** Trigger */
+            trigger: string | null;
+            /** Requested By User Id */
+            requested_by_user_id: string | null;
+            /** Instructions */
+            instructions: string | null;
+            /** Processing Started At */
+            processing_started_at: string | null;
+            /** Whatsapp Text */
+            whatsapp_text: string | null;
+            /** Email Subject */
+            email_subject: string | null;
+            /** Email Body */
+            email_body: string | null;
+            draft: components["schemas"]["OutreachDraft"] | null;
+            /** Drafted At */
+            drafted_at: string | null;
+            channel: components["schemas"]["ContactChannel"] | null;
+            /** Send Mode */
+            send_mode: string | null;
+            /** Approved By User Id */
+            approved_by_user_id: string | null;
+            /** Approved At */
+            approved_at: string | null;
+            /** Sent At */
+            sent_at: string | null;
+            /** Touchpoint Id */
+            touchpoint_id: string | null;
+            /** Error */
+            error: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** OutreachRedraft */
+        OutreachRedraft: {
+            /** Instructions */
+            instructions?: string | null;
+        };
+        /** OutreachRequest */
+        OutreachRequest: {
+            /** Instructions */
+            instructions?: string | null;
+            /**
+             * Again
+             * @default false
+             */
+            again: boolean;
+        };
+        /**
+         * OutreachSent
+         * @description The sending workflow's report.
+         */
+        OutreachSent: {
+            /**
+             * Channel
+             * @enum {string}
+             */
+            channel: "whatsapp" | "email";
+            /** Content */
+            content?: string | null;
+            /** Provider Message Id */
+            provider_message_id?: string | null;
+        };
+        /**
+         * OutreachStatus
+         * @description The personalised first message to a new lead, written by a workflow (AI)
+         *     from everything captured, approved by a person (or by the organization's
+         *     auto-send setting), and sent by a workflow or by the person themselves.
+         *
+         *     requested -> drafting -> draft_ready -> approved -> sending -> sent
+         *     failed (drafting or sending went wrong) and cancelled (a person gave up)
+         *     end it; a failed one can be drafted again or retried.
+         * @enum {string}
+         */
+        OutreachStatus: "requested" | "drafting" | "draft_ready" | "approved" | "sending" | "sent" | "failed" | "cancelled";
         /**
          * Permission
          * @enum {string}
          */
-        Permission: "leads:read" | "leads:write" | "leads:ingest" | "leads:sweep" | "stats:read" | "touchpoints:write" | "quotations:read" | "quotations:write" | "quotations:approve" | "samples:read" | "samples:write" | "accounts:read" | "accounts:write" | "accounts:delete" | "contacts:read" | "contacts:write" | "contacts:delete" | "catalog:read" | "catalog:write" | "events:read" | "events:write" | "cadences:read" | "cadences:write" | "users:read" | "users:write" | "keys:manage" | "audit:read" | "org:read" | "org:write" | "captures:read" | "captures:write" | "captures:process" | "research:process";
+        Permission: "leads:read" | "leads:write" | "leads:ingest" | "leads:sweep" | "stats:read" | "touchpoints:write" | "quotations:read" | "quotations:write" | "quotations:approve" | "samples:read" | "samples:write" | "accounts:read" | "accounts:write" | "accounts:delete" | "contacts:read" | "contacts:write" | "contacts:delete" | "catalog:read" | "catalog:write" | "events:read" | "events:write" | "cadences:read" | "cadences:write" | "users:read" | "users:write" | "keys:manage" | "audit:read" | "org:read" | "org:write" | "captures:read" | "captures:write" | "captures:process" | "research:process" | "outreach:process";
         /** ProductCreate */
         ProductCreate: {
             /** Name */
@@ -6313,6 +6821,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ResearchRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    request_first_touch_leads__lead_id__first_touch_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                lead_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["OutreachRequest"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutreachRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_lead_outreach_leads__lead_id__outreach_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                lead_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutreachRead"][];
                 };
             };
             /** @description Validation Error */
@@ -8800,6 +9374,442 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ResearchRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_outreach_outreach_get: {
+        parameters: {
+            query?: {
+                status?: components["schemas"]["OutreachStatus"] | null;
+                oldest_first?: boolean;
+                skip?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutreachRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_outreach_outreach__outreach_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                outreach_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutreachRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    edit_outreach_outreach__outreach_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                outreach_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OutreachEdit"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutreachRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    claim_outreach_outreach__outreach_id__claim_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                outreach_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutreachRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    outreach_context_outreach__outreach_id__context_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                outreach_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    submit_draft_outreach__outreach_id__draft_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                outreach_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OutreachDraftSubmit"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutreachRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    report_sent_outreach__outreach_id__sent_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                outreach_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OutreachSent"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutreachRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fail_outreach_outreach__outreach_id__fail_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                outreach_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OutreachFailure"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutreachRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_outreach_outreach__outreach_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                outreach_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OutreachApprove"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutreachRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mark_sent_outreach__outreach_id__mark_sent_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                outreach_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OutreachManualSend"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutreachRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    redraft_outreach_outreach__outreach_id__redraft_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                outreach_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["OutreachRedraft"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutreachRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    retry_outreach_outreach__outreach_id__retry_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                outreach_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutreachRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_outreach_outreach__outreach_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                outreach_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutreachRead"];
                 };
             };
             /** @description Validation Error */

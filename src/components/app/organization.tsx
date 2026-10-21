@@ -20,6 +20,20 @@ import { PageHeader } from "./page-header";
 import { FormSelect } from "./pickers";
 import type { Organization } from "@/lib/api/types";
 
+function formValues(org: Organization) {
+  return {
+    name: org.name,
+    new_lead_gap_hours: String(org.new_lead_gap_hours ?? 72),
+    fuzzy_match_threshold: String(org.fuzzy_match_threshold ?? 85),
+    assignment_strategy: org.assignment_strategy ?? "round_robin",
+    default_phone_region: org.default_phone_region ?? "",
+    business_description: org.business_description ?? "",
+    website: org.website ?? "",
+    auto_research_new_leads: org.auto_research_new_leads ?? false,
+    first_touch_auto_send: org.first_touch_auto_send ?? false,
+  };
+}
+
 function SettingsForm({
   org,
   canWrite,
@@ -35,27 +49,12 @@ function SettingsForm({
     return current ? [current, ...all.filter((c) => c !== current)] : all;
   }, [org.default_phone_region]);
   const { banner, setBanner, clear } = useFormBanner();
-  const form = useZodForm(organizationUpdate, {
-    name: org.name,
-    new_lead_gap_hours: String(org.new_lead_gap_hours ?? 72),
-    fuzzy_match_threshold: String(org.fuzzy_match_threshold ?? 85),
-    assignment_strategy: org.assignment_strategy ?? "round_robin",
-    default_phone_region: org.default_phone_region ?? "",
-    business_description: org.business_description ?? "",
-    website: org.website ?? "",
-    auto_research_new_leads: org.auto_research_new_leads ?? false,
-  } as never);
+  const form = useZodForm(organizationUpdate, formValues(org) as never);
   const { errors, isDirty } = form.formState;
 
-  // Reflect saves made elsewhere.
+  // Reflect saves made elsewhere (one list of fields for the first fill and every refill).
   React.useEffect(() => {
-    form.reset({
-      name: org.name,
-      new_lead_gap_hours: String(org.new_lead_gap_hours ?? 72),
-      fuzzy_match_threshold: String(org.fuzzy_match_threshold ?? 85),
-      assignment_strategy: org.assignment_strategy ?? "round_robin",
-      default_phone_region: org.default_phone_region ?? "",
-    } as never);
+    form.reset(formValues(org) as never);
   }, [org, form]);
 
   const onSubmit = form.handleSubmit(async (values) => {
@@ -156,6 +155,25 @@ function SettingsForm({
               <span className="font-medium">Research every new lead automatically</span>
               <span className="block text-[13px] text-muted">
                 Leads confirmed from a show capture are researched anyway, unless the reviewer unticks it.
+              </span>
+            </span>
+          </label>
+        </div>
+        <div className="space-y-4 border-t border-line pt-5">
+          <div>
+            <h3 className="text-[15px] font-semibold">First messages</h3>
+            <p className="text-[13px] text-muted">
+              When a lead is saved from a show, AI writes a personal message to the buyer from the
+              conversation, the notes and the card.
+            </p>
+          </div>
+          <label className="flex items-start gap-3 text-[14px]">
+            <Checkbox className="mt-0.5" {...form.register("first_touch_auto_send")} />
+            <span>
+              <span className="font-medium">Send first messages without review</span>
+              <span className="block text-[13px] text-muted">
+                On: it goes out as soon as it is written. Off: each one waits on the lead page until
+                someone approves it. Leads with follow-ups paused are never messaged automatically.
               </span>
             </span>
           </label>

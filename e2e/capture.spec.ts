@@ -60,8 +60,10 @@ test.describe("capture at a show", () => {
     await expect(page.getByLabel("Voice note")).toBeVisible();
 
     // The form arrives filled in from the API's draft, not the raw extraction.
-    await expect(page.getByLabel(/^Phone/)).toHaveValue("+6591234567"); // cleaned to one number…
-    await expect(page.getByText(/Several phone numbers were read/)).toBeVisible(); // …with a warning
+    await expect(page.getByLabel(/^Phone/)).toHaveValue("+6591234567"); // the first number on the card…
+    await expect(page.getByLabel("Alternate number")).toHaveValue("+6561230000"); // …the second is the alternate
+    await expect(page.getByText(/Two phone numbers were read/)).toBeVisible();
+    await expect(page.getByLabel(/^WhatsApp/)).toHaveValue("+6591234567"); // the main number unless the card names another
     await expect(page.getByText("Not in the catalogue: saffron")).toBeVisible();
     await expect(page.getByLabel("Country")).toHaveValue("SG");
     const picked = page.getByRole("list", { name: "Selected products" });
@@ -75,6 +77,10 @@ test.describe("capture at a show", () => {
     await page.getByText("In English").click();
     await expect(page.getByText("ten tons of oil every month")).toBeVisible();
     await expect(page.getByLabel("Research this lead after saving")).toBeChecked();
+    // Offered for a new enquiry only (an earlier test may have left Mr Lee an open lead to add to).
+    const fresh = page.getByRole("radio", { name: /New enquiry/ });
+    if (await fresh.isVisible().catch(() => false)) await fresh.check();
+    await expect(page.getByLabel("Write a personal message to send them")).toBeChecked();
 
     await confirmLead(page);
     // Confirm replaces the review page with the lead (Back doesn't return to a confirmed capture).
@@ -90,6 +96,8 @@ test.describe("capture at a show", () => {
     await expect(page.getByRole("link", { name: "Cold-pressed oil" })).toBeVisible();
     await expect(page.getByText("Send a price list and COA").first()).toBeVisible();
     await expect(page.getByText("Researching… (usually a few minutes)")).toBeVisible();
+    await expect(page.getByText("Writing a personal message…")).toBeVisible();
+    await expect(page.getByText("+65 6123 0000")).toBeVisible(); // the alternate number is on the contact
     await expect(page.getByText("Recording from the show")).toHaveCount(0); // it's a label, not text
     await expect(page.getByLabel("Recording from the show")).toBeVisible();
   });

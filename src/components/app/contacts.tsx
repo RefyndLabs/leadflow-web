@@ -48,6 +48,7 @@ import {
   UserOptions,
 } from "./pickers";
 import { usePhoneHint } from "./phone";
+import { SaveContactButton } from "./save-contact";
 
 export function ContactDialog({
   contact,
@@ -76,6 +77,7 @@ export function ContactDialog({
     email: contact?.email ?? "",
     designation: contact?.designation ?? "",
     whatsapp: contact?.whatsapp ?? "",
+    alternate_phone: contact?.alternate_phone ?? "",
     account_id: contact?.account_id ?? "",
   } as never);
   const { errors } = form.formState;
@@ -134,7 +136,7 @@ export function ContactDialog({
           </Field>
           <Field
             label="WhatsApp"
-            hint="Only if it's different from the phone number."
+            hint="The number to message on WhatsApp. Leave it empty to use the phone number."
             error={errors.whatsapp?.message as string | undefined}
           >
             <Input
@@ -142,6 +144,18 @@ export function ContactDialog({
               inputMode="tel"
               maxLength={50}
               {...form.register("whatsapp")}
+            />
+          </Field>
+          <Field
+            label="Alternate number"
+            hint="A second number, if they have one."
+            error={errors.alternate_phone?.message as string | undefined}
+          >
+            <Input
+              type="tel"
+              inputMode="tel"
+              maxLength={50}
+              {...form.register("alternate_phone")}
             />
           </Field>
           <Field
@@ -449,6 +463,9 @@ export function ContactDetail({ id }: { id: string }) {
   const { can } = useAuth();
   const confirm = useConfirm();
   const q = contacts.useOne(id);
+  const company = accounts.useOne(q.data?.account_id, {
+    enabled: can("accounts:read"),
+  });
   const remove = contacts.useRemove({ handled: true });
   const [editing, setEditing] = React.useState(false);
   const [newLead, setNewLead] = React.useState(false);
@@ -560,6 +577,17 @@ export function ContactDetail({ id }: { id: string }) {
                 </a>
               </Button>
             )}
+            <SaveContactButton
+              card={{
+                name: c.name,
+                phone: c.phone,
+                alternatePhone: c.alternate_phone,
+                whatsapp: c.whatsapp,
+                email: c.email,
+                company: company.data?.name,
+                title: c.designation,
+              }}
+            />
           </div>
           <dl className="divide-y divide-line text-[14px]">
             <div className="flex justify-between gap-4 py-2.5">
@@ -577,6 +605,19 @@ export function ContactDetail({ id }: { id: string }) {
                 )}
               </dd>
             </div>
+            {c.alternate_phone && (
+              <div className="flex justify-between gap-4 py-2.5">
+                <dt className="text-muted">Alternate number</dt>
+                <dd>
+                  <a
+                    href={telHref(c.alternate_phone)}
+                    className="text-accent hover:underline"
+                  >
+                    {formatPhone(c.alternate_phone)}
+                  </a>
+                </dd>
+              </div>
+            )}
             <div className="flex justify-between gap-4 py-2.5">
               <dt className="text-muted">Added</dt>
               <dd>{formatDate(c.created_at)}</dd>

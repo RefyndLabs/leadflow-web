@@ -96,6 +96,7 @@ const contacts = [
     email: "asha@raotextiles.com",
     designation: "Purchase manager",
     whatsapp: null,
+    alternate_phone: null,
     account_id: accounts[0].id,
     created_at: ago(200),
   },
@@ -106,6 +107,7 @@ const contacts = [
     email: null,
     designation: null,
     whatsapp: null,
+    alternate_phone: null,
     account_id: accounts[1].id,
     created_at: ago(90),
   },
@@ -351,6 +353,7 @@ const contactBrief = (c) =>
         phone: c.phone,
         email: c.email,
         whatsapp: c.whatsapp ?? null,
+        alternate_phone: c.alternate_phone ?? null,
         designation: c.designation ?? null,
       }
     : null;
@@ -361,10 +364,12 @@ const userBrief = (id) => {
 const leadNotes = new Map(); // lead id -> notes
 const leadProducts = new Map(); // lead id -> [{ product_id, quantity, note, source }]
 const research = new Map(); // lead id -> runs, newest first
+const outreach = new Map(); // lead id -> first messages, newest first
 const org = {
   business_description: null,
   website: null,
   auto_research_new_leads: false,
+  first_touch_auto_send: false,
 };
 const productsOf = (lead) =>
   (leadProducts.get(lead.id) ?? []).map((lp, i) => {
@@ -442,6 +447,43 @@ const queueResearch = (lead) => {
   return run;
 };
 const band = (s) => (s == null ? null : s >= 70 ? "hot" : s >= 40 ? "warm" : "cold");
+const OUTREACH_OPEN = ["requested", "drafting", "draft_ready", "approved", "sending"];
+const queueOutreach = (lead, trigger = "manual") => {
+  const open = (outreach.get(lead.id) ?? []).find((r) => OUTREACH_OPEN.includes(r.status));
+  if (open) return open;
+  const run = {
+    id: uid(),
+    lead_id: lead.id,
+    status: "requested",
+    trigger,
+    requested_by_user_id: ME.id,
+    instructions: null,
+    processing_started_at: null,
+    whatsapp_text: null,
+    email_subject: null,
+    email_body: null,
+    draft: null,
+    drafted_at: null,
+    channel: null,
+    send_mode: null,
+    approved_by_user_id: null,
+    approved_at: null,
+    sent_at: null,
+    touchpoint_id: null,
+    error: null,
+    created_at: now(),
+    updated_at: now(),
+  };
+  outreach.set(lead.id, [run, ...(outreach.get(lead.id) ?? [])]);
+  return run;
+};
+const findOutreach = (id) => {
+  for (const [leadId, runs] of outreach) {
+    const run = runs.find((r) => r.id === id);
+    if (run) return { run, lead: leads.find((l) => l.id === leadId) };
+  }
+  return null;
+};
 
 /** Catalogue match: name, SKU and aliases, either way round (so a sentence finds a product). */
 function matchProducts(q, limit = 5) {
@@ -754,6 +796,7 @@ function upsertLead(b, { source, eventId, message, productSource = "manual" }) {
       email: b.contact_email ?? null,
       designation: b.contact_designation ?? null,
       whatsapp: b.contact_whatsapp ? digits(b.contact_whatsapp) : null,
+      alternate_phone: b.contact_alternate_phone ? digits(b.contact_alternate_phone) : null,
       account_id: account.id,
       created_at: now(),
     };
@@ -836,11 +879,19 @@ function suggestionsFor(c) {
     .map((n) => n.trim())
     .filter(Boolean);
   const phone = numbers[0] ? digits(numbers[0]) : null;
+  const alternate = x.contact_alternate_phone
+    ? digits(x.contact_alternate_phone)
+    : numbers[1]
+      ? digits(numbers[1])
+      : null;
+  const whatsapp = x.contact_whatsapp ? digits(x.contact_whatsapp) : phone;
   const matches = (x.products_mentioned ?? [])
     .map((m) => ({ m, hit: matchProducts(m.name, 1)[0] }))
     .filter((v) => v.hit);
   const warnings = [];
-  if (numbers.length > 1) warnings.push(`Several phone numbers were read: ${numbers.join(", ")}`);
+  if (numbers.length > 2) warnings.push("More than two phone numbers were read: check the primary and the alternate number");
+  else if (numbers.length === 2)
+    warnings.push("Two phone numbers were read: the first is the primary number, the second the alternate");
   const unmatched = (x.products_mentioned ?? []).filter((m) => !matchProducts(m.name, 1).length);
   if (unmatched.length) warnings.push(`Not in the catalogue: ${unmatched.map((m) => m.name).join(", ")}`);
   const promises = x.conversation?.promises_made ?? [];
@@ -892,7 +943,8 @@ function suggestionsFor(c) {
         contact_phone: phone,
         contact_email: x.contact_email ?? null,
         contact_designation: x.contact_designation ?? null,
-        contact_whatsapp: null,
+        contact_whatsapp: whatsapp,
+        contact_alternate_phone: alternate,
         account_name: x.account_name ?? null,
         account_domain: null,
         account_industry: null,
@@ -927,9 +979,11 @@ function suggestionsFor(c) {
           .filter(Boolean)
           .join("\n\n"),
         request_research: true,
+        request_first_touch: true,
       },
       contact_phone_e164: phone,
-      contact_whatsapp_e164: null,
+      contact_whatsapp_e164: whatsapp,
+      contact_alternate_phone_e164: alternate,
       phone_country: phone?.startsWith("+65") ? "SG" : null,
       warnings,
     },
@@ -1052,6 +1106,101 @@ const server = createServer(async (req, res) => {
       lead.qualified_at = now();
     }
     return json(res, 200, run);
+  }
+
+  // Test hook (mock only): put a lead's first message into a given state, e.g. a written draft.
+  if ((m = /^\/__outreach\/([^/]+)$/.exec(path)) && method === "POST") {
+    const lead = leads.find((l) => l.id === m[1]);
+    if (!lead) return json(res, 404, { detail: "Lead not found" });
+    const b = (await readBody(req)) ?? {};
+    const run = outreach.get(lead.id)?.[0] ?? queueOutreach(lead);
+    Object.assign(run, b, {
+      drafted_at: b.status === "draft_ready" ? now() : run.drafted_at,
+      updated_at: now(),
+    });
+    return json(res, 200, run);
+  }
+
+  // ── the personalised first message ─────────────────────────────────────
+  if ((m = /^\/outreach\/([^/]+)(?:\/(approve|mark-sent|redraft|retry|cancel))?$/.exec(path))) {
+    const found = findOutreach(m[1]);
+    if (!found) return json(res, 404, { detail: "First message not found" });
+    const { run, lead } = found;
+    const action = m[2];
+    if (!action && method === "GET") return json(res, 200, run);
+    const b = (await readBody(req)) ?? {};
+    const conflict = () =>
+      json(res, 409, { detail: `Cannot do that to a first message that is ${run.status.replace("_", " ")}` });
+    const editable = ["draft_ready", "failed"].includes(run.status) && run.drafted_at;
+    const applyEdits = () => {
+      for (const k of ["whatsapp_text", "email_subject", "email_body"])
+        if (k in b) run[k] = b[k] === "" ? null : b[k];
+    };
+    const hasText = (ch) => (ch === "whatsapp" ? Boolean(run.whatsapp_text) : Boolean(run.email_subject && run.email_body));
+    run.updated_at = now();
+    if (!action && method === "PATCH") {
+      const bad = strict("OutreachEdit", b);
+      if (bad) return json(res, 422, bad);
+      if (!editable) return conflict();
+      applyEdits();
+      return json(res, 200, run);
+    }
+    if (action === "approve") {
+      const bad = strict("OutreachApprove", b);
+      if (bad) return json(res, 422, bad);
+      if (!editable) return conflict();
+      applyEdits();
+      const contact = contacts.find((c) => c.id === lead.contact_id);
+      if (b.channel === "email" ? !contact?.email : !(contact?.whatsapp || contact?.phone))
+        return json(res, 422, { detail: "The contact can't be reached on that channel" });
+      if (!hasText(b.channel)) return json(res, 422, { detail: "There is no message to send" });
+      Object.assign(run, { status: "approved", channel: b.channel, send_mode: "auto", approved_by_user_id: ME.id, approved_at: now(), error: null });
+      return json(res, 200, run);
+    }
+    if (action === "mark-sent") {
+      const bad = strict("OutreachManualSend", b);
+      if (bad) return json(res, 422, bad);
+      if (!(editable || (run.status === "approved" && run.drafted_at))) return conflict();
+      applyEdits();
+      if (!hasText(b.channel)) return json(res, 422, { detail: "There is no message to send" });
+      const tp = {
+        id: uid(),
+        lead_id: lead.id,
+        direction: "outbound",
+        channel: b.channel,
+        content:
+          b.channel === "whatsapp" ? run.whatsapp_text : `Subject: ${run.email_subject}
+
+${run.email_body}`,
+        raw_source_ref: null,
+        approved_by_user_id: ME.id,
+        approved_at: now(),
+        attachments: [],
+        created_at: now(),
+      };
+      touchpoints.set(lead.id, [...(touchpoints.get(lead.id) ?? []), tp]);
+      if (lead.status === "uncontacted") lead.status = "in_conversation";
+      lead.updated_at = now();
+      Object.assign(run, { status: "sent", channel: b.channel, send_mode: "manual", sent_at: now(), touchpoint_id: tp.id, approved_by_user_id: ME.id, approved_at: now() });
+      return json(res, 200, run);
+    }
+    if (action === "redraft") {
+      if (!editable) return conflict();
+      Object.assign(run, { status: "requested", instructions: b.instructions ?? null, whatsapp_text: null, email_subject: null, email_body: null, draft: null, drafted_at: null, channel: null, error: null });
+      return json(res, 200, run);
+    }
+    if (action === "retry") {
+      if (run.status !== "failed") return conflict();
+      run.status = run.drafted_at ? (run.approved_at ? "approved" : "draft_ready") : "requested";
+      run.error = null;
+      return json(res, 200, run);
+    }
+    if (action === "cancel") {
+      if (["sending", "sent", "cancelled"].includes(run.status)) return conflict();
+      run.status = "cancelled";
+      return json(res, 200, run);
+    }
+    return json(res, 405, { detail: "Method not allowed" });
   }
 
   if (path === "/auth/login" && method === "POST") {
@@ -1222,7 +1371,7 @@ const server = createServer(async (req, res) => {
 
   if (
     (m =
-      /^\/leads\/([^/]+)(?:\/(context|status|score|assign|touchpoints|quotations|sample-requests|notes|products|research)(?:\/([^/]+))?)?$/.exec(
+      /^\/leads\/([^/]+)(?:\/(context|status|score|assign|touchpoints|quotations|sample-requests|notes|products|research|first-touch|outreach)(?:\/([^/]+))?)?$/.exec(
         path,
       ))
   ) {
@@ -1255,6 +1404,7 @@ const server = createServer(async (req, res) => {
         })),
         captures: [...captures.values()].filter((c) => c.lead_id === lead.id).map((c) => capView(c)),
         research: research.get(lead.id)?.[0] ?? null,
+        outreach: outreach.get(lead.id)?.[0] ?? null,
         last_activity_at: lead.updated_at,
       });
     }
@@ -1296,6 +1446,17 @@ const server = createServer(async (req, res) => {
       if ("completed" in b) note.completed_at = b.completed ? now() : null;
       note.updated_at = now();
       return json(res, 200, note);
+    }
+    if (sub === "outreach") return json(res, 200, outreach.get(lead.id) ?? []);
+    if (sub === "first-touch") {
+      const b = (await readBody(req)) ?? {};
+      const bad = strict("OutreachRequest", b);
+      if (bad) return json(res, 422, bad);
+      const latest = (outreach.get(lead.id) ?? [])[0];
+      if (latest && (OUTREACH_OPEN.includes(latest.status) || !b.again)) return json(res, 200, latest);
+      const run = queueOutreach(lead, latest ? "again" : "manual");
+      run.instructions = b.instructions ?? null;
+      return json(res, 201, run);
     }
     if (sub === "research") {
       const runs = research.get(lead.id) ?? [];
@@ -1595,6 +1756,10 @@ const server = createServer(async (req, res) => {
         },
       );
       const run = b.request_research === false ? null : queueResearch(out.lead);
+      const firstTouch =
+        b.request_first_touch !== false && out.response.is_new_lead
+          ? queueOutreach(out.lead, "capture")
+          : null;
       c.status = "confirmed";
       c.lead_id = out.lead.id;
       c.confirmed_at = now();
@@ -1603,6 +1768,7 @@ const server = createServer(async (req, res) => {
         lead: out.response,
         redirect_lead_id: out.lead.id,
         research_id: run?.id ?? null,
+        outreach_id: firstTouch?.id ?? null,
       });
     }
   }

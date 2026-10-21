@@ -40,6 +40,7 @@ import type {
   MatchResult,
   Me,
   Organization,
+  Outreach,
   Page,
   Product,
   ProductMatch,
@@ -183,14 +184,23 @@ const invalidateLead = (qc: QueryClient, id: string) => {
 const researching = (r: Research | null | undefined) =>
   r?.status === "requested" || r?.status === "processing";
 
-/** The lead page in one call. Polls every 15 s while a research run is queued or running. */
+/** A workflow is writing or sending the first message: the page waits for it. */
+export const outreachBusy = (o: Outreach | null | undefined) =>
+  o?.status === "requested" ||
+  o?.status === "drafting" ||
+  o?.status === "approved" ||
+  o?.status === "sending";
+
+/** The lead page in one call. Polls every 15 s while research or the first message is being worked on. */
 export function useLeadContext(id: string) {
   return useQuery({
     queryKey: ["leads", "context", id],
     queryFn: ({ signal }) =>
       api<LeadContext>(`/leads/${id}/context`, { signal }),
     refetchInterval: (q) =>
-      researching(q.state.data?.research) ? 15_000 : false,
+      researching(q.state.data?.research) || outreachBusy(q.state.data?.outreach)
+        ? 15_000
+        : false,
   });
 }
 
@@ -854,6 +864,59 @@ export function useResearchHistory(leadId: string, enabled: boolean) {
       api<Research[]>(`/leads/${leadId}/research`, { signal }),
     enabled,
   });
+}
+
+/* ── Lead page: the personalised first message ──────────────────────────── */
+type OutreachText = {
+  whatsapp_text?: string | null;
+  email_subject?: string | null;
+  email_body?: string | null;
+};
+
+/** Ask for, edit, approve, send by hand, rewrite, retry or cancel the lead's first message. */
+export function useOutreachActions(leadId: string) {
+  const qc = useQueryClient();
+  const done = () => invalidateLead(qc, leadId);
+  const post = (id: string, action: string, body?: unknown) =>
+    api<Outreach>(`/outreach/${id}/${action}`, { method: "POST", body });
+  return {
+    request: useMutation({
+      mutationFn: (body: { instructions?: string; again?: boolean }) =>
+        api<Outreach>(`/leads/${leadId}/first-touch`, { method: "POST", body }),
+      onSuccess: done,
+    }),
+    save: useMutation({
+      mutationFn: ({ id, body }: { id: string; body: OutreachText }) =>
+        api<Outreach>(`/outreach/${id}`, { method: "PATCH", body }),
+      meta: { handled: true },
+      onSuccess: done,
+    }),
+    approve: useMutation({
+      mutationFn: ({ id, body }: { id: string; body: OutreachText & { channel: "whatsapp" | "email" } }) =>
+        post(id, "approve", body),
+      meta: { handled: true },
+      onSuccess: done,
+    }),
+    markSent: useMutation({
+      mutationFn: ({ id, body }: { id: string; body: OutreachText & { channel: "whatsapp" | "email" } }) =>
+        post(id, "mark-sent", body),
+      meta: { handled: true },
+      onSuccess: done,
+    }),
+    redraft: useMutation({
+      mutationFn: ({ id, instructions }: { id: string; instructions?: string }) =>
+        post(id, "redraft", instructions ? { instructions } : {}),
+      onSuccess: done,
+    }),
+    retry: useMutation({
+      mutationFn: (id: string) => post(id, "retry"),
+      onSuccess: done,
+    }),
+    cancel: useMutation({
+      mutationFn: (id: string) => post(id, "cancel"),
+      onSuccess: done,
+    }),
+  };
 }
 
 /* ── Catalogue: match-as-you-type and categories ────────────────────────── */

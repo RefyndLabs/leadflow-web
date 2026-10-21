@@ -86,12 +86,19 @@ function defaultsFrom(c: Capture) {
   const x = c.extracted;
   const d: Partial<CaptureConfirmDraft> = c.suggestions?.confirm_draft ?? {};
   const s = (draft: string | null | undefined, raw?: string | null) => draft ?? raw ?? "";
+  const phone = s(d.contact_phone, x?.contact_phone);
+  const rawPhones = splitPhones(x?.contact_phone);
   return {
     contact_name: s(d.contact_name, x?.contact_name),
-    contact_phone: s(d.contact_phone, x?.contact_phone),
+    contact_phone: phone,
     contact_email: s(d.contact_email, x?.contact_email),
     contact_designation: s(d.contact_designation, x?.contact_designation),
-    contact_whatsapp: s(d.contact_whatsapp, x?.contact_whatsapp),
+    // WhatsApp goes to the main number unless the card names another one.
+    contact_whatsapp: s(d.contact_whatsapp, x?.contact_whatsapp) || (splitPhones(phone)[0] ?? phone),
+    // The draft already split two numbers; before that, the raw extraction's second number.
+    contact_alternate_phone: c.suggestions
+      ? s(d.contact_alternate_phone)
+      : s(x?.contact_alternate_phone) || (rawPhones[1] ?? ""),
     account_name: s(d.account_name, x?.account_name),
     account_domain: s(d.account_domain, x?.account_domain),
     account_industry: s(d.account_industry, x?.account_industry),
@@ -111,6 +118,7 @@ function defaultsFrom(c: Capture) {
     event_id: d.event_id ?? c.event_id ?? "",
     content: d.content ?? contentFrom(c),
     request_research: d.request_research ?? true,
+    request_first_touch: d.request_first_touch ?? true,
     ...exportDetailsDefaults(c.suggestions ? d : x),
   };
 }
@@ -359,6 +367,16 @@ function ReviewForm({ capture }: { capture: Capture }) {
     "account_name",
   ]) as [string, string, string, string, string];
   const phones = splitPhones(phoneRaw);
+  const mainPhone = (phones[0] ?? phoneRaw ?? "").trim();
+  const lastPhone = React.useRef(mainPhone);
+  React.useEffect(() => {
+    const before = lastPhone.current;
+    lastPhone.current = mainPhone;
+    if (mainPhone === before) return;
+    // WhatsApp still empty or still the old phone number = it was never a different number: keep it in step.
+    const wa = ((form.getValues() as { contact_whatsapp?: string }).contact_whatsapp ?? "").trim();
+    if (wa === "" || wa === before) form.setValue("contact_whatsapp", mainPhone as never);
+  }, [mainPhone, form]);
   const productIds = picked.map((p) => p.product_id);
   const who = {
     name: (name ?? "").trim(),
@@ -567,9 +585,13 @@ function ReviewForm({ capture }: { capture: Capture }) {
                             <button
                               key={p}
                               type="button"
-                              onClick={() =>
-                                form.setValue("contact_phone", p as never, { shouldDirty: true, shouldValidate: true })
-                              }
+                              onClick={() => {
+                                form.setValue("contact_phone", p as never, { shouldDirty: true, shouldValidate: true });
+                                const other = phones.find((q) => q !== p);
+                                const alternate = (form.getValues() as { contact_alternate_phone?: string }).contact_alternate_phone;
+                                if (other && !alternate?.trim())
+                                  form.setValue("contact_alternate_phone", other as never, { shouldDirty: true });
+                              }}
                               className="rounded-full bg-accent-soft px-2.5 py-1 text-[13px] font-medium text-accent"
                             >
                               {p}
@@ -598,10 +620,17 @@ function ReviewForm({ capture }: { capture: Capture }) {
                 </Field>
                 <Field
                   label="WhatsApp"
-                  hint="Only if it's different from the phone number."
+                  hint="The number to message on WhatsApp: the phone number, unless the card shows a different WhatsApp number."
                   error={errors.contact_whatsapp?.message as string | undefined}
                 >
                   <Input type="tel" inputMode="tel" maxLength={50} {...form.register("contact_whatsapp")} />
+                </Field>
+                <Field
+                  label="Alternate number"
+                  hint="Only when the card has a second number."
+                  error={errors.contact_alternate_phone?.message as string | undefined}
+                >
+                  <Input type="tel" inputMode="tel" maxLength={50} {...form.register("contact_alternate_phone")} />
                 </Field>
               </div>
               <p className="text-[13px] text-muted">
@@ -806,6 +835,17 @@ function ReviewForm({ capture }: { capture: Capture }) {
             >
               <Textarea rows={4} maxLength={20000} {...form.register("content")} />
             </Field>
+            {resolution?.kind !== "attach" && (
+              <label className="flex items-start gap-3 text-[14px]">
+                <Checkbox className="mt-0.5" {...form.register("request_first_touch")} />
+                <span>
+                  <span className="font-medium">Write a personal message to send them</span>
+                  <span className="block text-[13px] text-muted">
+                    AI writes it from the conversation, your notes and the card. You check and send it from the lead page.
+                  </span>
+                </span>
+              </label>
+            )}
             <label className="flex items-start gap-3 text-[14px]">
               <Checkbox className="mt-0.5" {...form.register("request_research")} />
               <span>
