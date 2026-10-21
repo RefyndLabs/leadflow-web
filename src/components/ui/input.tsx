@@ -1,5 +1,5 @@
 import * as React from "react";
-import { ChevronsUpDown, Eye, EyeOff } from "lucide-react";
+import { Check, ChevronsUpDown, Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const control =
@@ -112,18 +112,32 @@ export function Select({
   );
 }
 
+/**
+ * The tick is an icon over the box rather than a CSS background image: Tailwind splits class
+ * names on spaces, so an inline SVG inside an arbitrary background-image class never compiles.
+ * `className` styles the wrapper (callers use it for alignment); all other props land on the <input>.
+ */
 export function Checkbox({
   className,
   ...props
 }: Omit<React.ComponentProps<"input">, "type">) {
   return (
-    <input
-      type="checkbox"
+    <span
       className={cn(
-        "size-[18px] shrink-0 cursor-pointer appearance-none rounded-[5px] border border-line-strong bg-surface transition-colors checked:border-accent checked:bg-accent checked:bg-[url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22 fill=%22none%22 stroke=%22white%22 stroke-width=%222.4%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22><path d=%22M3.5 8.5l3 3 6-7%22/></svg>')] checked:bg-center checked:bg-no-repeat disabled:opacity-50",
+        "relative inline-grid size-[18px] shrink-0 place-items-center",
         className,
       )}
-      {...props}
-    />
+    >
+      <input
+        type="checkbox"
+        className="peer col-start-1 row-start-1 size-full cursor-pointer appearance-none rounded-[5px] border border-line-strong bg-surface transition-colors checked:border-accent checked:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+        {...props}
+      />
+      <Check
+        aria-hidden
+        strokeWidth={3}
+        className="pointer-events-none col-start-1 row-start-1 size-3.5 text-accent-fg opacity-0 transition-opacity peer-checked:opacity-100 peer-checked:peer-disabled:opacity-50"
+      />
+    </span>
   );
 }
