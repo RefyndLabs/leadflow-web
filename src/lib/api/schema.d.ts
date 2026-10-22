@@ -15,7 +15,7 @@ export interface paths {
          * Health
          * @description Liveness: the process is up. Says nothing about its dependencies.
          */
-        get: operations["health_health_head"];
+        get: operations["health_health_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -24,7 +24,7 @@ export interface paths {
          * Health
          * @description Liveness: the process is up. Says nothing about its dependencies.
          */
-        head: operations["health_health_head"];
+        head: operations["health_health_get"];
         patch?: never;
         trace?: never;
     };
@@ -40,7 +40,7 @@ export interface paths {
          * @description Readiness: can this instance actually serve traffic (database, Redis)?
          *     A load balancer should route on this, not on /health.
          */
-        get: operations["ready_ready_head"];
+        get: operations["ready_ready_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -50,7 +50,7 @@ export interface paths {
          * @description Readiness: can this instance actually serve traffic (database, Redis)?
          *     A load balancer should route on this, not on /health.
          */
-        head: operations["ready_ready_head"];
+        head: operations["ready_ready_get"];
         patch?: never;
         trace?: never;
     };
@@ -2163,6 +2163,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/integrations/whatsapp/{phone_number_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Org By Whatsapp Number
+         * @description The organization that owns the WhatsApp number an inbound message
+         *     arrived on (Meta's `metadata.phone_number_id`).
+         */
+        get: operations["get_org_by_whatsapp_number_integrations_whatsapp__phone_number_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/whatsapp/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Find Message
+         * @description Which lead message a WhatsApp message id belongs to (e.g. for a delivery
+         *     failure Meta reports later). Accepts ids stored as `whatsapp:<id>` or bare.
+         */
+        get: operations["find_message_whatsapp_messages_get"];
+        put?: never;
+        /** Send Message */
+        post: operations["send_message_whatsapp_messages_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3487,6 +3530,10 @@ export interface components {
             exhibition_reviewer_email: string | null;
             /** Handoff Email */
             handoff_email: string | null;
+            /** Whatsapp Phone Number Id */
+            whatsapp_phone_number_id: string | null;
+            /** Whatsapp Configured */
+            whatsapp_configured: boolean;
         };
         /** LastInbound */
         LastInbound: {
@@ -4235,6 +4282,13 @@ export interface components {
             exhibition_reviewer_email?: string | null;
             /** Handoff Email */
             handoff_email?: string | null;
+            /** Whatsapp Phone Number Id */
+            whatsapp_phone_number_id?: string | null;
+            /**
+             * Whatsapp Configured
+             * @default false
+             */
+            whatsapp_configured: boolean;
         };
         /**
          * OrganizationUpdate
@@ -4442,7 +4496,7 @@ export interface components {
          * Permission
          * @enum {string}
          */
-        Permission: "leads:read" | "leads:write" | "leads:ingest" | "leads:sweep" | "stats:read" | "touchpoints:write" | "quotations:read" | "quotations:write" | "quotations:approve" | "samples:read" | "samples:write" | "accounts:read" | "accounts:write" | "accounts:delete" | "contacts:read" | "contacts:write" | "contacts:delete" | "catalog:read" | "catalog:write" | "events:read" | "events:write" | "cadences:read" | "cadences:write" | "users:read" | "users:write" | "keys:manage" | "audit:read" | "org:read" | "org:write" | "captures:read" | "captures:write" | "captures:process" | "research:process" | "outreach:process";
+        Permission: "leads:read" | "leads:write" | "leads:ingest" | "leads:sweep" | "stats:read" | "touchpoints:write" | "quotations:read" | "quotations:write" | "quotations:approve" | "samples:read" | "samples:write" | "accounts:read" | "accounts:write" | "accounts:delete" | "contacts:read" | "contacts:write" | "contacts:delete" | "catalog:read" | "catalog:write" | "events:read" | "events:write" | "cadences:read" | "cadences:write" | "users:read" | "users:write" | "keys:manage" | "audit:read" | "org:read" | "org:write" | "captures:read" | "captures:write" | "captures:process" | "research:process" | "outreach:process" | "whatsapp:send";
         /** ProductCreate */
         ProductCreate: {
             /** Name */
@@ -5034,6 +5088,85 @@ export interface components {
             /** Context */
             ctx?: Record<string, never>;
         };
+        /**
+         * WhatsAppMessageRead
+         * @description The lead message a WhatsApp message id belongs to.
+         */
+        WhatsAppMessageRead: {
+            /** Wamid */
+            wamid: string;
+            /**
+             * Lead Id
+             * Format: uuid
+             */
+            lead_id: string;
+            /**
+             * Touchpoint Id
+             * Format: uuid
+             */
+            touchpoint_id: string;
+            /** Direction */
+            direction: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /**
+         * WhatsAppSend
+         * @description One message from the organization's WhatsApp number.
+         *
+         *     `text` is a free-form message (Meta accepts it only within 24 hours of the
+         *     customer's last message); outside that window use an approved `template`.
+         *     With `lead_id`, the message is recorded on the lead as an outbound
+         *     touchpoint (`log_content`, else the text) in the same step.
+         */
+        WhatsAppSend: {
+            /**
+             * To
+             * @description The recipient's number with country code
+             */
+            to: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "text" | "template";
+            /** Text */
+            text?: string | null;
+            template?: components["schemas"]["WhatsAppTemplate"] | null;
+            /** Lead Id */
+            lead_id?: string | null;
+            /** Log Content */
+            log_content?: string | null;
+        };
+        /** WhatsAppSent */
+        WhatsAppSent: {
+            /** Wamid */
+            wamid: string;
+            /** To */
+            to: string;
+            /** Lead Id */
+            lead_id?: string | null;
+            /** Touchpoint Id */
+            touchpoint_id?: string | null;
+        };
+        /**
+         * WhatsAppTemplate
+         * @description An approved Meta message template. `body_params` fill {{1}}, {{2}}, ... in order.
+         */
+        WhatsAppTemplate: {
+            /** Name */
+            name: string;
+            /**
+             * Language
+             * @default en
+             */
+            language: string;
+            /** Body Params */
+            body_params?: string[];
+        };
     };
     responses: never;
     parameters: never;
@@ -5043,7 +5176,7 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    health_health_head: {
+    health_health_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -5063,7 +5196,7 @@ export interface operations {
             };
         };
     };
-    health_health_head: {
+    health_health_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -5083,7 +5216,7 @@ export interface operations {
             };
         };
     };
-    ready_ready_head: {
+    ready_ready_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -5103,7 +5236,7 @@ export interface operations {
             };
         };
     };
-    ready_ready_head: {
+    ready_ready_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -9956,6 +10089,115 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+        };
+    };
+    get_org_by_whatsapp_number_integrations_whatsapp__phone_number_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                phone_number_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationOrgRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    find_message_whatsapp_messages_get: {
+        parameters: {
+            query: {
+                wamid: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WhatsAppMessageRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    send_message_whatsapp_messages_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WhatsAppSend"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WhatsAppSent"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Failed Dependency */
+            424: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
