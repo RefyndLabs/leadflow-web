@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { uploadCaptureFile } from "../capture-media";
 import { api, apiList, newIdempotencyKey, type Query } from "./client";
 import type {
+  IgnoredSender,
   MessageTemplate,
   Account,
   ApiKey,
@@ -171,6 +172,9 @@ export const events = crud<EventRecord, Record<string, unknown>>("/events");
 export const cadences = crud<Cadence, Record<string, unknown>>("/cadences");
 export const messageTemplates = crud<MessageTemplate, Record<string, unknown>>(
   "/message-templates",
+);
+export const ignoredSenders = crud<IgnoredSender, Record<string, unknown>>(
+  "/ignored-senders",
 );
 export const users = crud<User, Record<string, unknown>>("/users");
 export const leads = crud<Lead, Record<string, unknown>>("/leads");

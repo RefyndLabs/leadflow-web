@@ -15,7 +15,7 @@ export interface paths {
          * Health
          * @description Liveness: the process is up. Says nothing about its dependencies.
          */
-        get: operations["health_health_head"];
+        get: operations["health_health_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -24,7 +24,7 @@ export interface paths {
          * Health
          * @description Liveness: the process is up. Says nothing about its dependencies.
          */
-        head: operations["health_health_head"];
+        head: operations["health_health_get"];
         patch?: never;
         trace?: never;
     };
@@ -40,7 +40,7 @@ export interface paths {
          * @description Readiness: can this instance actually serve traffic (database, Redis)?
          *     A load balancer should route on this, not on /health.
          */
-        get: operations["ready_ready_head"];
+        get: operations["ready_ready_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -50,7 +50,7 @@ export interface paths {
          * @description Readiness: can this instance actually serve traffic (database, Redis)?
          *     A load balancer should route on this, not on /health.
          */
-        head: operations["ready_ready_head"];
+        head: operations["ready_ready_get"];
         patch?: never;
         trace?: never;
     };
@@ -1594,6 +1594,71 @@ export interface paths {
         head?: never;
         /** Update Message Template */
         patch: operations["update_message_template_message_templates__template_id__patch"];
+        trace?: never;
+    };
+    "/ignored-senders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Ignored Senders
+         * @description Most recently heard from first.
+         */
+        get: operations["list_ignored_senders_ignored_senders_get"];
+        put?: never;
+        /**
+         * Record Ignored Sender
+         * @description Adds the sender (201), or counts another message from one already on
+         *     the list (200).
+         */
+        post: operations["record_ignored_sender_ignored_senders_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ignored-senders/lookup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lookup Ignored Sender
+         * @description Is this sender on the list? 404 = no (judge the message as usual).
+         */
+        get: operations["lookup_ignored_sender_ignored_senders_lookup_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ignored-senders/{sender_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Unignore Sender
+         * @description Un-ignore: their next message is judged afresh (and can become a lead).
+         */
+        delete: operations["unignore_sender_ignored_senders__sender_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/collaterals": {
@@ -3588,6 +3653,58 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /**
+         * IgnoredSenderCreate
+         * @description The intake workflow judged a sender not to be a buyer. Recording the same
+         *     sender again counts another message and keeps the latest reason/snippet.
+         */
+        IgnoredSenderCreate: {
+            /**
+             * Channel
+             * @enum {string}
+             */
+            channel: "whatsapp" | "email";
+            /**
+             * Address
+             * @description WhatsApp number or email address
+             */
+            address: string;
+            /** Reason */
+            reason?: string | null;
+            /**
+             * Snippet
+             * @description Their message (the start is kept)
+             */
+            snippet?: string | null;
+        };
+        /** IgnoredSenderRead */
+        IgnoredSenderRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Channel */
+            channel: string;
+            /** Address */
+            address: string;
+            /** Reason */
+            reason: string | null;
+            /** Snippet */
+            snippet: string | null;
+            /** Message Count */
+            message_count: number;
+            /**
+             * Last Message At
+             * Format: date-time
+             */
+            last_message_at: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
         /** IngestTouchpoint */
         IngestTouchpoint: {
             direction: components["schemas"]["TouchpointDirection"];
@@ -5347,7 +5464,7 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    health_health_head: {
+    health_health_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -5367,7 +5484,7 @@ export interface operations {
             };
         };
     };
-    health_health_head: {
+    health_health_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -5387,7 +5504,7 @@ export interface operations {
             };
         };
     };
-    ready_ready_head: {
+    ready_ready_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -5407,7 +5524,7 @@ export interface operations {
             };
         };
     };
-    ready_ready_head: {
+    ready_ready_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -9046,6 +9163,133 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["MessageTemplateRead"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_ignored_senders_ignored_senders_get: {
+        parameters: {
+            query?: {
+                channel?: ("whatsapp" | "email") | null;
+                skip?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IgnoredSenderRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    record_ignored_sender_ignored_senders_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IgnoredSenderCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IgnoredSenderRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    lookup_ignored_sender_ignored_senders_lookup_get: {
+        parameters: {
+            query: {
+                channel: "whatsapp" | "email";
+                address: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IgnoredSenderRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unignore_sender_ignored_senders__sender_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sender_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

@@ -13,6 +13,7 @@ import {
   ShieldCheck,
   UserRound,
   Users,
+  UserX,
   type LucideIcon,
 } from "lucide-react";
 
@@ -59,6 +60,12 @@ export const NAV: NavGroup[] = [
         label: "Follow-ups",
         icon: BellRing,
         permission: "cadences:read",
+      },
+      {
+        href: "/ignored-senders",
+        label: "Ignored senders",
+        icon: UserX,
+        permission: "leads:read",
       },
     ],
   },

@@ -12,6 +12,8 @@ const RESOURCES = new Set([
   "leads",
   "products",
   "cadences",
+  "message-templates",
+  "ignored-senders",
   "collaterals",
   "catalogue",
   "faqs",

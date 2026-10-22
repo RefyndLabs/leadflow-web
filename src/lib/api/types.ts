@@ -22,6 +22,7 @@ export type CurrentEvents = S["CurrentEventsResponse"];
 export type Cadence = S["CadenceRead"];
 export type DueLead = S["DueLeadRead"];
 export type MessageTemplate = S["MessageTemplateRead"];
+export type IgnoredSender = S["IgnoredSenderRead"];
 export type Quotation = S["QuotationRead"];
 export type SampleRequest = S["SampleRequestRead"];
 export type User = S["UserRead"];

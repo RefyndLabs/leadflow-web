@@ -60,9 +60,26 @@ describe("gateway allow-list", () => {
       ["outreach", "3f2c1e9a-1111-4222-8333-444455556666", "mark-sent"],
       "/outreach/3f2c1e9a-1111-4222-8333-444455556666/mark-sent",
     ],
+    [["message-templates"], "/message-templates"],
+    [
+      ["message-templates", "3f2c1e9a-1111-4222-8333-444455556666"],
+      "/message-templates/3f2c1e9a-1111-4222-8333-444455556666",
+    ],
+    [["ignored-senders"], "/ignored-senders"],
+    [
+      ["ignored-senders", "3f2c1e9a-1111-4222-8333-444455556666"],
+      "/ignored-senders/3f2c1e9a-1111-4222-8333-444455556666",
+    ],
+    [
+      ["leads", "3f2c1e9a-1111-4222-8333-444455556666", "handoff"],
+      "/leads/3f2c1e9a-1111-4222-8333-444455556666/handoff",
+    ],
   ])("allows %j", (segs, target) => expect(resolveTarget(segs)).toBe(target));
 
   it.each([
+    // The automation's own endpoints are never reachable from the browser.
+    [["whatsapp", "messages"]],
+    [["integrations", "orgs"]],
     [["auth", "login"]],
     [["captures", "3f2c1e9a-1111-4222-8333-444455556666", "claim"]],
     [["captures", "3f2c1e9a-1111-4222-8333-444455556666", "extraction"]],

@@ -14,6 +14,7 @@ const ROUTES = [
   "/contacts",
   "/accounts",
   "/follow-ups",
+  "/ignored-senders",
   "/catalog",
   "/catalog?tab=collateral",
   "/events",
