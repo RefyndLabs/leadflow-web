@@ -280,6 +280,19 @@ export function useUpdateLead(leadId: string, opts: MutationOpts<Lead> = {}) {
   });
 }
 
+/** Lets the WhatsApp bot (and automated follow-ups) resume after it handed the lead to a person. */
+export function useResumeBot(leadId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      api<Lead>(`/leads/${leadId}/handoff`, { method: "DELETE" }),
+    onSuccess: () => {
+      invalidateLead(qc, leadId);
+      toast.success("The WhatsApp bot will reply to this lead again");
+    },
+  });
+}
+
 /** One idempotency key per form submission attempt; reused if the same submission is retried. */
 export function useLogTouchpoint(
   leadId: string,

@@ -15,7 +15,7 @@ export interface paths {
          * Health
          * @description Liveness: the process is up. Says nothing about its dependencies.
          */
-        get: operations["health_health_get"];
+        get: operations["health_health_head"];
         put?: never;
         post?: never;
         delete?: never;
@@ -24,7 +24,7 @@ export interface paths {
          * Health
          * @description Liveness: the process is up. Says nothing about its dependencies.
          */
-        head: operations["health_health_get"];
+        head: operations["health_health_head"];
         patch?: never;
         trace?: never;
     };
@@ -40,7 +40,7 @@ export interface paths {
          * @description Readiness: can this instance actually serve traffic (database, Redis)?
          *     A load balancer should route on this, not on /health.
          */
-        get: operations["ready_ready_get"];
+        get: operations["ready_ready_head"];
         put?: never;
         post?: never;
         delete?: never;
@@ -50,7 +50,7 @@ export interface paths {
          * @description Readiness: can this instance actually serve traffic (database, Redis)?
          *     A load balancer should route on this, not on /health.
          */
-        head: operations["ready_ready_get"];
+        head: operations["ready_ready_head"];
         patch?: never;
         trace?: never;
     };
@@ -718,6 +718,33 @@ export interface paths {
         /** Assign Lead */
         post: operations["assign_lead_leads__lead_id__assign_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/leads/{lead_id}/handoff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Hand Off Lead
+         * @description The WhatsApp bot hands the conversation to a person: the bot stays quiet
+         *     and automated follow-ups skip the lead until someone lets it resume
+         *     (DELETE). Also leaves a note on the lead. Doing it again while already
+         *     handed off changes nothing.
+         */
+        post: operations["hand_off_lead_leads__lead_id__handoff_post"];
+        /**
+         * Resume Bot
+         * @description Lets the WhatsApp bot (and automated follow-ups) resume on this lead.
+         */
+        delete: operations["resume_bot_leads__lead_id__handoff_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2496,6 +2523,21 @@ export interface components {
              */
             file: string;
         };
+        /**
+         * BotHandoffCreate
+         * @description The WhatsApp bot hands the conversation to a person.
+         */
+        BotHandoffCreate: {
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "commercial" | "human_requested";
+            /** Reason */
+            reason?: string | null;
+            /** Customer Message */
+            customer_message?: string | null;
+        };
         /** BulkIngestItemResult */
         BulkIngestItemResult: {
             /** Index */
@@ -3023,6 +3065,12 @@ export interface components {
              * @default false
              */
             follow_ups_paused: boolean;
+            /** Bot Handoff At */
+            bot_handoff_at?: string | null;
+            /** Bot Handoff Type */
+            bot_handoff_type?: string | null;
+            /** Bot Handoff Reason */
+            bot_handoff_reason?: string | null;
             /** Qualification Score */
             qualification_score?: number | null;
             qualification_tag?: components["schemas"]["LeadQualityTag"] | null;
@@ -3868,6 +3916,12 @@ export interface components {
              * @default false
              */
             follow_ups_paused: boolean;
+            /** Bot Handoff At */
+            bot_handoff_at?: string | null;
+            /** Bot Handoff Type */
+            bot_handoff_type?: string | null;
+            /** Bot Handoff Reason */
+            bot_handoff_reason?: string | null;
             /** Qualification Score */
             qualification_score?: number | null;
             qualification_tag?: components["schemas"]["LeadQualityTag"] | null;
@@ -4094,6 +4148,12 @@ export interface components {
              * @default false
              */
             follow_ups_paused: boolean;
+            /** Bot Handoff At */
+            bot_handoff_at?: string | null;
+            /** Bot Handoff Type */
+            bot_handoff_type?: string | null;
+            /** Bot Handoff Reason */
+            bot_handoff_reason?: string | null;
             /** Qualification Score */
             qualification_score?: number | null;
             qualification_tag?: components["schemas"]["LeadQualityTag"] | null;
@@ -5287,7 +5347,7 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    health_health_get: {
+    health_health_head: {
         parameters: {
             query?: never;
             header?: never;
@@ -5307,7 +5367,7 @@ export interface operations {
             };
         };
     };
-    health_health_get: {
+    health_health_head: {
         parameters: {
             query?: never;
             header?: never;
@@ -5327,7 +5387,7 @@ export interface operations {
             };
         };
     };
-    ready_ready_get: {
+    ready_ready_head: {
         parameters: {
             query?: never;
             header?: never;
@@ -5347,7 +5407,7 @@ export interface operations {
             };
         };
     };
-    ready_ready_get: {
+    ready_ready_head: {
         parameters: {
             query?: never;
             header?: never;
@@ -6872,6 +6932,72 @@ export interface operations {
                 "application/json": components["schemas"]["LeadAssignUpdate"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    hand_off_lead_leads__lead_id__handoff_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                lead_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BotHandoffCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resume_bot_leads__lead_id__handoff_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                lead_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {

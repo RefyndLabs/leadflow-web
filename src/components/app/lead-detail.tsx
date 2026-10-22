@@ -16,6 +16,7 @@ import {
   useAssignLead,
   useChangeStatus,
   useLeadContext,
+  useResumeBot,
   useScoreLead,
   useUpdateLead,
 } from "@/lib/api/hooks";
@@ -635,6 +636,56 @@ function FollowUp({ at, closed }: { at: string | null | undefined; closed: boole
   );
 }
 
+/** The WhatsApp bot handed this conversation to a person: it stays quiet, and
+ * automated follow-ups skip the lead, until someone lets it resume. */
+function BotHandoffBanner({ lead, canWrite }: { lead: Lead; canWrite: boolean }) {
+  const resume = useResumeBot(lead.id);
+  const confirm = useConfirm();
+  if (!lead.bot_handoff_at) return null;
+  const why =
+    lead.bot_handoff_type === "human_requested"
+      ? "the customer asked to talk to a person"
+      : "they asked about price, samples or an order";
+
+  const onResume = async () => {
+    const ok = await confirm({
+      title: "Let the WhatsApp bot reply again?",
+      description:
+        "The bot will answer this customer's next WhatsApp message, and automated follow-ups start again.",
+      confirmLabel: "Let the bot reply",
+    });
+    if (ok) resume.mutate();
+  };
+
+  return (
+    <InlineAlert tone="warning" className="mb-4">
+      <span className="flex flex-wrap items-center justify-between gap-3">
+        <span>
+          <span className="font-medium">Handed to your team</span> by the
+          WhatsApp bot {formatRelative(lead.bot_handoff_at)}, because {why}.
+          The bot stays quiet and automated follow-ups are paused until you
+          let it reply again.
+          {lead.bot_handoff_reason && (
+            <span className="mt-1 block text-[13px]">
+              Bot&apos;s note: {lead.bot_handoff_reason}
+            </span>
+          )}
+        </span>
+        {canWrite && (
+          <Button
+            variant="secondary"
+            size="sm"
+            loading={resume.isPending}
+            onClick={() => void onResume()}
+          >
+            Let the bot reply
+          </Button>
+        )}
+      </span>
+    </InlineAlert>
+  );
+}
+
 export function LeadDetail({ id }: { id: string }) {
   const { can } = useAuth();
   const q = useLeadContext(id);
@@ -704,6 +755,7 @@ export function LeadDetail({ id }: { id: string }) {
               <Badge tone="neutral">AI {lead.qualification_score}</Badge>
             )}
             {lead.follow_ups_paused && <Badge>Follow-ups paused</Badge>}
+            {lead.bot_handoff_at && <Badge>Handed to team</Badge>}
             {canWrite && (
               <Button
                 variant="secondary"
@@ -718,6 +770,7 @@ export function LeadDetail({ id }: { id: string }) {
         }
       />
 
+      <BotHandoffBanner lead={lead} canWrite={canWrite} />
       {lead.requirement_summary && (
         <p className="mb-4 rounded-[12px] bg-surface-2 px-4 py-3 text-[14px]">
           <span className="text-muted">They need: </span>
