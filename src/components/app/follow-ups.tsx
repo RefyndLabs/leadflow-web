@@ -6,19 +6,30 @@ import {
   BellRing,
   ChevronRight,
   Clock,
+  MessageSquare,
   Pencil,
   Plus,
   RefreshCw,
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { cadences, useDueCadences, useSweepStale } from "@/lib/api/hooks";
+import {
+  cadences,
+  messageTemplates,
+  useDueCadences,
+  useSweepStale,
+} from "@/lib/api/hooks";
 import { describeError } from "@/lib/api/errors";
-import type { Cadence, Lead } from "@/lib/api/types";
+import type { Cadence, Lead, MessageTemplate } from "@/lib/api/types";
 import { LEAD_STATUSES, STATUS_LABEL } from "@/lib/enums";
 import { formatRelative } from "@/lib/format";
 import { applyApiError, useFormBanner, useZodForm } from "@/lib/forms";
-import { cadenceCreate, cadenceUpdate } from "@/lib/schemas";
+import {
+  cadenceCreate,
+  cadenceUpdate,
+  messageTemplateCreate,
+  messageTemplateUpdate,
+} from "@/lib/schemas";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useConfirm } from "@/components/ui/confirm";
@@ -30,7 +41,7 @@ import {
   RowsSkeleton,
 } from "@/components/ui/feedback";
 import { Field } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
+import { Input, Textarea } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "./auth";
 import { StatusBadge } from "./badges";
@@ -64,6 +75,11 @@ function CadenceDialog({
     email_message_template_id: cadence?.email_message_template_id ?? "",
   } as never);
   const { errors } = form.formState;
+  const templates = messageTemplates.useList({ limit: 200 });
+  const keysFor = (channel: string) =>
+    (templates.data?.items ?? [])
+      .filter((t) => t.channel === channel)
+      .map((t) => t.key);
 
   const onSubmit = form.handleSubmit(async (values) => {
     clear();
@@ -84,7 +100,7 @@ function CadenceDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         title={editing ? "Edit follow-up rule" : "New follow-up rule"}
-        description="When a lead has been in a status for a while, this template is due."
+        description="When a lead has been in a status for a while, this message is due."
       >
         <form onSubmit={onSubmit} noValidate className="space-y-4">
           {banner && <InlineAlert>{banner}</InlineAlert>}
@@ -112,20 +128,26 @@ function CadenceDialog({
             />
           </Field>
           <Field
-            label="WhatsApp template ID"
+            label="WhatsApp message"
             required
             error={errors.message_template_id?.message as string | undefined}
-            hint="The ID of a template in n8n, for example nudge-followup-1. Message text isn't stored here."
+            hint="The key of a message on the Messages tab, for example nudge-followup-1."
           >
             <Input
               maxLength={300}
               autoCapitalize="none"
               spellCheck={false}
+              list="whatsapp-message-keys"
               {...form.register("message_template_id")}
             />
           </Field>
+          <datalist id="whatsapp-message-keys">
+            {keysFor("whatsapp").map((k) => (
+              <option key={k} value={k} />
+            ))}
+          </datalist>
           <Field
-            label="Email template ID"
+            label="Email message"
             error={
               errors.email_message_template_id?.message as string | undefined
             }
@@ -135,9 +157,15 @@ function CadenceDialog({
               maxLength={300}
               autoCapitalize="none"
               spellCheck={false}
+              list="email-message-keys"
               {...form.register("email_message_template_id" as never)}
             />
           </Field>
+          <datalist id="email-message-keys">
+            {keysFor("email").map((k) => (
+              <option key={k} value={k} />
+            ))}
+          </datalist>
           <DialogFooter>
             <Button variant="secondary" onClick={() => onOpenChange(false)}>
               Cancel
@@ -272,9 +300,8 @@ function Rules() {
   return (
     <div className="space-y-4">
       <InlineAlert tone="accent">
-        These rules decide <em>when</em> a follow-up is due. The message wording
-        lives in n8n as a template — this screen only stores the template&apos;s
-        ID.
+        These rules decide <em>when</em> a follow-up is due. What it says is on
+        the Messages tab: each rule names a message by its key.
       </InlineAlert>
       {canWrite && (
         <div className="flex justify-end">
@@ -293,7 +320,7 @@ function Rules() {
           <EmptyState
             icon={Clock}
             title="No follow-up rules yet"
-            description="Add a rule such as “when a lead is In conversation for 1 day, use template nudge-followup-1”."
+            description="Add a rule such as “when a lead is In conversation for 1 day, send message nudge-followup-1”."
             action={
               canWrite ? (
                 <Button onClick={() => setDialog({})}>
@@ -324,7 +351,7 @@ function Rules() {
                       {hoursLabel(c.delay_hours)}
                     </p>
                     <p className="mt-1 text-[13px] text-muted">
-                      WhatsApp template{" "}
+                      WhatsApp message{" "}
                       <span className="font-mono text-foreground">
                         {c.message_template_id}
                       </span>
@@ -386,23 +413,289 @@ function Rules() {
   );
 }
 
+function MessageDialog({
+  template,
+  open,
+  onOpenChange,
+}: {
+  template?: MessageTemplate;
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+}) {
+  const editing = Boolean(template);
+  const create = messageTemplates.useCreate({
+    handled: true,
+    success: "Message added",
+  });
+  const update = messageTemplates.useUpdate({
+    handled: true,
+    success: "Message updated",
+  });
+  const { banner, setBanner, clear } = useFormBanner();
+  const form = useZodForm(
+    editing ? messageTemplateUpdate : messageTemplateCreate,
+    {
+      ...(editing ? {} : { key: "", channel: "whatsapp" }),
+      body: template?.body ?? "",
+      email_subject: template?.email_subject ?? "",
+      whatsapp_template_name: template?.whatsapp_template_name ?? "",
+      language: template?.language ?? "en",
+    } as never,
+  );
+  const errors = form.formState.errors as Record<
+    string,
+    { message?: unknown } | undefined
+  >;
+  const errorOf = (name: string) => errors[name]?.message as string | undefined;
+  const watchedChannel = form.watch("channel" as never) as unknown as
+    string | undefined;
+  const channel = editing ? template!.channel : watchedChannel;
+
+  const onSubmit = form.handleSubmit(async (values) => {
+    clear();
+    try {
+      if (editing)
+        await update.mutateAsync({
+          id: template!.id,
+          body: values as Record<string, unknown>,
+        });
+      else await create.mutateAsync(values as Record<string, unknown>);
+      onOpenChange(false);
+    } catch (e) {
+      setBanner(applyApiError(form as never, e));
+    }
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        title={editing ? `Edit message ${template!.key}` : "New message"}
+        description="The text of an automated follow-up. {first_name} and {name} are filled in for each customer."
+      >
+        <form onSubmit={onSubmit} noValidate className="space-y-4">
+          {banner && <InlineAlert>{banner}</InlineAlert>}
+          {!editing && (
+            <>
+              <Field
+                label="Key"
+                required
+                error={errorOf("key")}
+                hint="What follow-up rules use to name this message, e.g. nudge-followup-1. Can't be changed later."
+              >
+                <Input
+                  maxLength={100}
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  {...form.register("key" as never)}
+                />
+              </Field>
+              <FormSelect
+                control={form.control as never}
+                name="channel"
+                label="Sent by"
+                required
+              >
+                <option value="whatsapp">WhatsApp</option>
+                <option value="email">Email</option>
+              </FormSelect>
+            </>
+          )}
+          {channel === "email" && (
+            <Field
+              label="Email subject"
+              required
+              error={errorOf("email_subject")}
+            >
+              <Input
+                maxLength={300}
+                {...form.register("email_subject" as never)}
+              />
+            </Field>
+          )}
+          <Field label="Message" required error={errorOf("body")}>
+            <Textarea
+              rows={6}
+              maxLength={4000}
+              {...form.register("body" as never)}
+            />
+          </Field>
+          {channel !== "email" && (
+            <Field
+              label="Approved WhatsApp template name"
+              error={errorOf("whatsapp_template_name")}
+              hint="Optional. WhatsApp only delivers plain text within 24 hours of the customer's last message. Name a template approved in Meta (its {{1}} is the first name) to reach them after that."
+            >
+              <Input
+                maxLength={512}
+                autoCapitalize="none"
+                spellCheck={false}
+                {...form.register("whatsapp_template_name" as never)}
+              />
+            </Field>
+          )}
+          <Field
+            label="Language"
+            required
+            error={errorOf("language")}
+            hint="The language code of the approved template, e.g. en."
+          >
+            <Input
+              maxLength={15}
+              autoCapitalize="none"
+              spellCheck={false}
+              {...form.register("language" as never)}
+            />
+          </Field>
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" loading={form.formState.isSubmitting}>
+              {editing ? "Save changes" : "Add message"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function Messages() {
+  const { can } = useAuth();
+  const confirm = useConfirm();
+  const q = messageTemplates.useList({ limit: 200 });
+  const remove = messageTemplates.useRemove({ success: "Message deleted" });
+  const [dialog, setDialog] = React.useState<{
+    template?: MessageTemplate;
+  } | null>(null);
+  const canWrite = can("cadences:write");
+
+  return (
+    <div className="space-y-4">
+      <InlineAlert tone="accent">
+        What automated follow-ups say. Follow-up rules pick a message by its
+        key. Use {"{first_name}"} or {"{name}"} to address the customer.
+      </InlineAlert>
+      {canWrite && (
+        <div className="flex justify-end">
+          <Button onClick={() => setDialog({})}>
+            <Plus aria-hidden />
+            New message
+          </Button>
+        </div>
+      )}
+      <Card className="overflow-hidden">
+        {q.isPending ? (
+          <RowsSkeleton rows={3} />
+        ) : q.isError ? (
+          <ErrorState error={q.error} onRetry={() => void q.refetch()} />
+        ) : q.data.items.length === 0 ? (
+          <EmptyState
+            icon={MessageSquare}
+            title="No messages yet"
+            description="Add the text a follow-up rule sends, for example “Hi {first_name}, just checking in on your enquiry.”"
+            action={
+              canWrite ? (
+                <Button onClick={() => setDialog({})}>
+                  <Plus aria-hidden />
+                  Add the first message
+                </Button>
+              ) : undefined
+            }
+          />
+        ) : (
+          <ul className="divide-y divide-line">
+            {q.data.items.map((t) => (
+              <li
+                key={t.id}
+                className="flex items-start gap-3 px-4 py-3.5 sm:px-5"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-[15px]">
+                    <span className="font-mono">{t.key}</span>{" "}
+                    <span className="text-[13px] text-muted">
+                      · {t.channel === "email" ? "Email" : "WhatsApp"}
+                      {t.whatsapp_template_name &&
+                        ` · template ${t.whatsapp_template_name}`}
+                    </span>
+                  </p>
+                  {t.email_subject && (
+                    <p className="mt-1 text-[13px] font-medium">
+                      {t.email_subject}
+                    </p>
+                  )}
+                  <p className="mt-1 line-clamp-2 whitespace-pre-line text-[13px] text-muted">
+                    {t.body}
+                  </p>
+                </div>
+                {canWrite && (
+                  <div className="flex shrink-0 gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`Edit message ${t.key}`}
+                      onClick={() => setDialog({ template: t })}
+                    >
+                      <Pencil />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`Delete message ${t.key}`}
+                      onClick={async () => {
+                        if (
+                          await confirm({
+                            title: `Delete message ${t.key}?`,
+                            description:
+                              "Rules that use this key stop sending until a message with that key exists again.",
+                            confirmLabel: "Delete message",
+                            destructive: true,
+                          })
+                        )
+                          remove.mutate(t.id);
+                      }}
+                    >
+                      <Trash2 className="text-danger" />
+                    </Button>
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+      {dialog && (
+        <MessageDialog
+          template={dialog.template}
+          open
+          onOpenChange={() => setDialog(null)}
+        />
+      )}
+    </div>
+  );
+}
+
 export function FollowUps() {
   return (
     <>
       <PageHeader
         title="Follow-ups"
-        description="What's due now, and the rules that decide when."
+        description="What's due now, the rules that decide when, and what each follow-up says."
       />
       <Tabs defaultValue="due">
         <TabsList aria-label="Follow-up sections">
           <TabsTrigger value="due">Due now</TabsTrigger>
           <TabsTrigger value="rules">Rules</TabsTrigger>
+          <TabsTrigger value="messages">Messages</TabsTrigger>
         </TabsList>
         <TabsContent value="due">
           <DueList />
         </TabsContent>
         <TabsContent value="rules">
           <Rules />
+        </TabsContent>
+        <TabsContent value="messages">
+          <Messages />
         </TabsContent>
       </Tabs>
     </>

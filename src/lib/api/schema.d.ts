@@ -1499,6 +1499,10 @@ export interface paths {
          *     carries the contact's phone/email and when they last wrote on WhatsApp and
          *     by email, so the caller can pick a channel that can actually reach them.
          *     Oldest first, capped at `limit` per call. Requires `cadences:read`.
+         *
+         *     Each item also carries the messages its cadence points at
+         *     (`message_template`, `email_message_template`; null when no message with
+         *     that key exists), so the sender needs no template store of its own.
          */
         get: operations["leads_due_cadences_due_get"];
         put?: never;
@@ -1526,6 +1530,43 @@ export interface paths {
         head?: never;
         /** Update Cadence */
         patch: operations["update_cadence_cadences__cadence_id__patch"];
+        trace?: never;
+    };
+    "/message-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Message Templates */
+        get: operations["list_message_templates_message_templates_get"];
+        put?: never;
+        /** Create Message Template */
+        post: operations["create_message_template_message_templates_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/message-templates/{template_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Message Template */
+        get: operations["get_message_template_message_templates__template_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Message Template */
+        delete: operations["delete_message_template_message_templates__template_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Message Template */
+        patch: operations["update_message_template_message_templates__template_id__patch"];
         trace?: never;
     };
     "/collaterals": {
@@ -3118,6 +3159,8 @@ export interface components {
             cadence: components["schemas"]["CadenceRead"];
             contact: components["schemas"]["ContactBrief"];
             last_inbound_at: components["schemas"]["LastInbound"];
+            message_template?: components["schemas"]["MessageTemplateRead"] | null;
+            email_message_template?: components["schemas"]["MessageTemplateRead"] | null;
         };
         /**
          * DuplicateCapture
@@ -4211,6 +4254,74 @@ export interface components {
             note?: string | null;
             /** Confidence */
             confidence?: number | null;
+        };
+        /** MessageTemplateCreate */
+        MessageTemplateCreate: {
+            /**
+             * Key
+             * @description What cadence rules refer to, e.g. nudge-followup-1
+             */
+            key: string;
+            /**
+             * Channel
+             * @enum {string}
+             */
+            channel: "whatsapp" | "email";
+            /** Body */
+            body: string;
+            /** Email Subject */
+            email_subject?: string | null;
+            /** Whatsapp Template Name */
+            whatsapp_template_name?: string | null;
+            /**
+             * Language
+             * @default en
+             */
+            language: string;
+        };
+        /** MessageTemplateRead */
+        MessageTemplateRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Key */
+            key: string;
+            /** Channel */
+            channel: string;
+            /** Body */
+            body: string;
+            /** Email Subject */
+            email_subject: string | null;
+            /** Whatsapp Template Name */
+            whatsapp_template_name: string | null;
+            /** Language */
+            language: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * MessageTemplateUpdate
+         * @description `key` and `channel` are fixed once created: cadence rules point at the key.
+         */
+        MessageTemplateUpdate: {
+            /** Body */
+            body?: string | null;
+            /** Email Subject */
+            email_subject?: string | null;
+            /** Whatsapp Template Name */
+            whatsapp_template_name?: string | null;
+            /** Language */
+            language?: string | null;
         };
         /** OpenLeadRead */
         OpenLeadRead: {
@@ -8648,6 +8759,166 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CadenceRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_message_templates_message_templates_get: {
+        parameters: {
+            query?: {
+                skip?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageTemplateRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_message_template_message_templates_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MessageTemplateCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageTemplateRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_message_template_message_templates__template_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageTemplateRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_message_template_message_templates__template_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_message_template_message_templates__template_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MessageTemplateUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageTemplateRead"];
                 };
             };
             /** @description Validation Error */

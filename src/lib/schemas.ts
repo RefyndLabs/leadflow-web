@@ -641,6 +641,52 @@ export const cadenceUpdate = z.strictObject({
   email_message_template_id: textNull(300),
 });
 
+/* ── Message templates (the text of automated follow-ups) ─────────────── */
+const templateKey = z
+  .string({ error: "Key is required" })
+  .trim()
+  .regex(
+    /^[a-z0-9][a-z0-9._-]{0,99}$/,
+    "Lowercase letters, digits, dots, dashes or underscores, e.g. nudge-followup-1",
+  );
+const metaTemplateName = z.preprocess(
+  emptyToNull,
+  z
+    .string()
+    .trim()
+    .max(512, "Keep it under 512 characters")
+    .regex(/^[a-z0-9_]+$/, "Lowercase letters, digits and underscores only")
+    .nullable(),
+);
+const templateLanguage = z
+  .string()
+  .trim()
+  .regex(/^[A-Za-z]{2,3}([_-][A-Za-z0-9]{2,8})?$/, "A language code, e.g. en or en_US");
+export const messageTemplateCreate = z
+  .strictObject({
+    key: templateKey,
+    channel: z.enum(["whatsapp", "email"], { error: "Choose a channel" }),
+    body: req(4000, "Message"),
+    email_subject: textNull(300),
+    whatsapp_template_name: metaTemplateName,
+    language: templateLanguage,
+  })
+  .refine((v) => v.channel !== "email" || Boolean(v.email_subject), {
+    message: "An email needs a subject",
+    path: ["email_subject"],
+  })
+  .refine((v) => v.channel !== "email" || !v.whatsapp_template_name, {
+    message: "Only for WhatsApp messages",
+    path: ["whatsapp_template_name"],
+  });
+/** Key and channel are fixed once created (follow-up rules point at the key). */
+export const messageTemplateUpdate = z.strictObject({
+  body: req(4000, "Message"),
+  email_subject: textNull(300),
+  whatsapp_template_name: metaTemplateName,
+  language: templateLanguage,
+});
+
 /* ── Captures (booth photo + voice note) ───────────────────────────────── */
 export const captureCreate = z.strictObject({
   event_id: optionalUuid,
