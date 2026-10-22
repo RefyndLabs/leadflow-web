@@ -33,11 +33,11 @@ Channels → n8n (orchestration) → Core API (FastAPI) → PostgreSQL
 
 **PostgreSQL** is the single source of truth. n8n and the frontend both go through the API — nothing touches the database directly except the API.
 
-**Frontend (Next.js)** — mobile-optimized, used by the sales team. Not part of this initial build phase; API comes first.
+**Frontend (Next.js)** — mobile-optimized, used by the sales team. Built separately (`exporter-leadflow-web`), it talks to this API only, server-side.
 
 **Auth:** scoped, organization-bound API key for n8n → API calls. Short-lived JWT + refresh token (server-side revocable sessions) for frontend → API calls, with role-based permissions (exec / manager / admin). See "Multi-tenancy and security decisions" below.
 
-**Hosting:** single VPS, Docker Compose (Caddy for TLS, Postgres, Redis, the API, a backup sidecar), ~$20–40/month; the API is stateless so it can scale out later. Runbook: docs/OPERATIONS.md.
+**Hosting:** single VPS, Docker Compose (Caddy for TLS, Postgres, Redis, the API, a backup sidecar), ~$20–40/month; the API is stateless so it can scale out later. Runbook: docs/OPERATIONS.md. **Today** a free-tier demo runs on Render (API) + Neon (Postgres) + Upstash (Redis) + Vercel (web app): docs/OPERATIONS.md §12.
 
 ## Multi-tenancy and security decisions (made; do not re-decide)
 
@@ -77,6 +77,8 @@ Represents a person at an Account.
 | phone | text | no* | normalized on write — see dedupe rules |
 | email | text | no* | normalized (lower-cased, trimmed) on write |
 | designation | text | no | |
+| whatsapp | text | no | the number to WhatsApp, E.164. A confirmed show capture fills it with the main number unless the card names another one |
+| alternate_phone | text | no | a second number (a card with two numbers), E.164; informational, not an identity |
 | created_at | timestamp | yes | |
 
 \* A contact needs **a phone and/or an email** (database check constraint). Email-only contacts are normal: email enquiries often carry no number. Each is unique per organization when present.
@@ -136,6 +138,9 @@ Same minimal shape as Collateral: `id`, `title`, `content`/`file_url`, `tags`. K
 A **Capture** is a draft lead taken at an exhibition: optional card photos (front, and the back for two-sided cards), optional voice note, optional typed note, an Event, and what the extraction workflow suggested. Status: `draft -> submitted -> processing -> ready_for_review -> confirmed` (or `failed`, `discarded`). A person confirming it creates the Lead (source `exhibition`) through the normal ingest rules; extraction only ever suggests.
 
 An **Attachment** is a stored file (`image` or `audio`) owned by one organization, kept in Postgres (so isolation, audit, backups and offboarding cover it): photos are re-encoded as clean JPEGs (no EXIF, upright, max 2560 px), voice notes are stored as recorded. After confirmation an attachment belongs to the lead's first Touchpoint. File contents never enter the audit log.
+
+### Lead outreach (the first message)
+A personalised first message to a new lead, one in progress per lead at most. Queued when a show capture is confirmed as a new lead (or from the lead page). **n8n's AI writes it** from what the API gives it (the voice note, typed note, card, products, promises); a **person** edits and approves it (or the organization turns on auto-send, never for leads with follow-ups paused); n8n sends it, or the person sends it from their own phone. The sent message becomes an outbound Touchpoint. Status: `requested → drafting → draft_ready → approved → sending → sent` (or `failed`, `cancelled`). The API stores the draft and the decision; it never writes or sends the text itself.
 
 ### Cadence
 Configuration for follow-up timing, not hardcoded logic.
@@ -236,11 +241,13 @@ PATCH /leads/{id}/status      — update conversation state
 POST /leads/{id}/score        — set/record quality tag
 POST /leads/{id}/assign       — set/reassign owner
 GET  /cadences/due            — leads needing a follow-up action right now
+POST /leads/{id}/first-touch  — ask for a personalised first message (a person approves it before it goes out)
+GET  /outreach?status=requested|approved, POST /outreach/{id}/claim|draft|sent|fail — the writing and sending workflows
 ```
 
 Plus standard CRUD for Account, Contact, Collateral, Catalogue, FAQ, Event, User/Team, and auth endpoints (login/session for frontend, key validation for n8n).
 
-**What does NOT belong in this API:** message content/templates, cadence timing values, AI extraction prompts. Those live in n8n, built separately, so non-engineers can adjust them without a deploy. This API only decides *when* something should happen and *whether* a lead is a duplicate — never *what* gets sent to anyone.
+**What does NOT belong in this API:** message content/templates, cadence timing values, AI extraction prompts. (The one exception is the first message to a new lead: the API *stores* the AI-written draft so a person can review and approve it, but the text is written by n8n's AI and the API sends nothing.) Those live in n8n, built separately, so non-engineers can adjust them without a deploy. This API only decides *when* something should happen and *whether* a lead is a duplicate — never *what* gets sent to anyone.
 
 ## Build order
 

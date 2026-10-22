@@ -1,5 +1,7 @@
 # Web app hand-off: capture v2, lead lists, lead page, research
 
+**Status (22 Oct 2026): done.** Everything below is built in the web app and deployed (Vercel), along with migration `0009`'s alternate number, WhatsApp default, first-message card and Save contact (see the web app's `README.md`). Kept as the reference for the contract.
+
 **For:** the agent working on the web app (`exporter-leadflow-web`).
 **API date:** 9 October 2026, migration `0007`. **Updated 17 October 2026, migration `0008`: two-sided business cards (front + optional back photo). Read §00 first.**
 **Read with:** `STATUS_UI.md` (how the app talks to the API) and `openapi.json`.
@@ -198,7 +200,7 @@ capture.duplicates   DuplicateCheck (see 4.3)
 ### 4.2 Build the form from `suggestions.confirm_draft`
 
 **Use `suggestions.confirm_draft` as the form's initial values**, not `extracted`. The draft already contains:
-- the phone number cleaned to E.164, and the WhatsApp number when it differs;
+- the phone number cleaned to E.164, and the WhatsApp number (since `0009`: the main number unless the card names another; a second number on the card becomes `contact_alternate_phone`);
 - the country, taken from the phone number when the card did not say it;
 - all export details;
 - `products` (pre-selected) and `product_id` (the main product);
@@ -219,7 +221,7 @@ capture.duplicates   DuplicateCheck (see 4.3)
 ### 4.3 Form sections
 
 **A. Contact**
-- Fields: name, phone, email, designation, **WhatsApp (if different from phone)**.
+- Fields: name, phone, email, designation, **WhatsApp** (pre-filled with the phone number since `0009`), **alternate number** (since `0009`).
 
 **B. Company**
 - Fields: name, **country (select)**, **website**, location, industry.

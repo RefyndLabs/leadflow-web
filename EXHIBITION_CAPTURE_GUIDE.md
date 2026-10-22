@@ -34,7 +34,7 @@ Things worth knowing:
 - **A failed extraction never blocks a lead.** If n8n is down or the card is unreadable, the rep can still type the details and confirm. Captures can be confirmed from any open state.
 - **The API never calls n8n.** It only waits to be polled, like `/cadences/due`. So n8n needs no inbound webhook, and the API needs no n8n address or secret.
 - **Fast at a booth.** Capturing is just step 2-4 and takes seconds; review happens later from the queue, from any phone or laptop.
-- **After confirming**, the card photo and the voice note are attached to the lead's first message (a touchpoint, channel `exhibition`) and show up in the lead's conversation.
+- **After confirming**, the card photo and the voice note are attached to the lead's first message (a touchpoint, channel `exhibition`) and show up in the lead's conversation. For a new lead, a personalised first message *to the buyer* is also queued (migration `0009`): AI writes it from the voice note, typed note and card, and a person approves it on the lead page.
 
 ---
 
@@ -191,7 +191,7 @@ Remove the "enter fields, paste a file link, submit to `/leads/ingest`" screen f
 
 **C. "Review capture" screen**
 - Left/top: the **card photo** (zoomable) and an **audio player** for the voice note. Below: the extraction's raw `card_text` and `transcript` (collapsible), and `extraction_error` if any.
-- A **form pre-filled from `extracted`**, every field editable: contact name/phone/email/designation, company name/domain/industry/location, lead title, requirement summary, and `content` ("what was discussed/needed" — pre-fill from `requirement_summary` + `next_steps`). Mark fields with low `confidence` (< 0.6) so the reviewer looks at them first. Phone numbers from OCR may hold two numbers or junk: let the person pick/clean one.
+- A **form pre-filled from `extracted`**, every field editable: contact name/phone/email/designation, company name/domain/industry/location, lead title, requirement summary, and `content` ("what was discussed/needed" — pre-fill from `requirement_summary` + `next_steps`). Mark fields with low `confidence` (< 0.6) so the reviewer looks at them first. Phone numbers from OCR may hold two numbers or junk: let the person pick/clean one. (Since migration `0009` the review draft already does this: the first number is the phone, the second the **alternate number**, and WhatsApp is the main number unless the card names another.)
 - **Duplicate check before confirming:** call `GET /leads/match?phone=…&email=…&company=…` with the entered values. If the contact has open leads, show them and let the rep choose "add to this lead" (`lead_resolution: "attach"` + `lead_id`) or "new enquiry" (`"new"`), as described in `FRONTEND_BUILD_GUIDE.md` §5.9.
 - **Confirm lead** → `POST /captures/{id}/confirm` with the form values. On success go to the new lead. Map errors: `422` field messages inline; `409` "already confirmed" → open the lead (`capture.lead_id` from `GET /captures/{id}`).
 - Secondary actions: **Discard** (confirm dialog: "this deletes the photo and recording"), **Retry reading** (`POST /submit`, shown when `failed` or `ready_for_review`), and for `failed`/`draft` captures the form simply starts empty — a person can always type it in.
@@ -290,7 +290,7 @@ Notes:
 - **Remove the old "exhibition pipeline"** described in `N8N_INTEGRATION_GUIDE.md` §5 (n8n receiving the photo/voice some other way, doing OCR, asking a human, then calling `/leads/ingest` with `source: "exhibition"` and a link in `raw_source_ref`). The UI confirm step now creates exhibition leads. **Do not call `/leads/ingest` for exhibition leads any more.** (Other channels are unchanged.)
 - If you previously had a WhatsApp number for sending card photos, that is not part of this flow; it can be added later as another way of *creating a capture*, but that needs a `captures:write`-style permission that keys deliberately do not have today (ask before building it).
 - **Scheduled housekeeping is unchanged**: `/cadences/due` and `/leads/sweep-stale` flows need nothing. Exhibition leads join them normally once confirmed (their first message is inbound, channel `exhibition`).
-- Re-check lead follow-up templates: an exhibition lead's contact may have only a phone, only an email, or both (see `/cadences/due` `contact` and `last_inbound_at`). A WhatsApp contact made at a show has never written to you on WhatsApp, so the 24-hour reply window does not apply: use an approved template for the first outbound message.
+- Re-check lead follow-up templates: an exhibition lead's contact may have only a phone, only an email, or both (see `/cadences/due` `contact` and `last_inbound_at`). A WhatsApp contact made at a show has never written to you on WhatsApp, so the 24-hour reply window does not apply: use an approved template for the first outbound message. (Since migration `0009` that first message is the **personalised first touch**: queued on confirm, written by AI, approved on the lead page, sent through the `leadflow_first_touch` template; see `HANDOFF_N8N_FIRST_TOUCH.md`.)
 
 ---
 

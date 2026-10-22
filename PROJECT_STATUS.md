@@ -2,7 +2,7 @@
 
 An honest description of what exists in this repo right now, how it is secured, how it was verified, and what is *not* done. Read [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) for the spec and decisions, [docs/OPERATIONS.md](docs/OPERATIONS.md) for deploying and running it, and [N8N_INTEGRATION_GUIDE.md](N8N_INTEGRATION_GUIDE.md) for wiring workflows.
 
-**One-line summary:** a multi-tenant FastAPI + PostgreSQL backend with tenant isolation enforced in three independent layers, short-lived JWTs with server-side revocable sessions, scoped org-bound API keys for n8n, an append-only audit log, and a containerised production stack with encrypted, restore-tested backups. It has been tested thoroughly on a developer machine and has **not** been run in a real production environment (see §9).
+**One-line summary:** a multi-tenant FastAPI + PostgreSQL backend with tenant isolation enforced in three independent layers, short-lived JWTs with server-side revocable sessions, scoped org-bound API keys for n8n, an append-only audit log, and a containerised production stack with encrypted, restore-tested backups. Since 20 October 2026 it runs as a **free-tier demo deployment** (Render + Neon Postgres + Upstash Redis, web app on Vercel; see §1i); the production Docker stack in `deploy/` has still never run on a real server (see §9).
 
 ---
 
@@ -33,6 +33,25 @@ Breaking changes for anything written against the earlier version: API keys must
 - (Phone numbers were later moved to international form: see 1e.) Contacts have no persistent review flag: `needs_review` is reported in the ingest response only. The reuse window is the existing per-organization `new_lead_gap_hours`, not a new setting.
 - Also closed: any `change-me…` JWT secret (including the one in `.env.example`) is now refused by the production startup check.
 
+### 1h. Later change: alternate number, WhatsApp default, personalised first message (migration `0009`, 21 Oct 2026)
+
+- **Contacts have an `alternate_phone`** (E.164, informational, not an identity). On ingest and capture confirm: `contact_alternate_phone`. The show-capture extraction may send it; if it sends two numbers in `contact_phone` (`"a / b"`), the review draft makes the first the primary and the second the alternate (more than two: a warning).
+- **WhatsApp defaults to the main number:** the capture review draft fills `contact_whatsapp` with the primary number unless the card names a different WhatsApp number, and a WhatsApp number equal to the phone is now stored (it used to be dropped). `ContactBrief`/`ContactRead` gained `alternate_phone` (additive).
+- **First touch (`lead_outreach`, a new tenant table with RLS like every other):** confirming a show capture as a **new** lead queues a personalised first message (`request_first_touch`, default true); `POST /leads/{id}/first-touch` asks for one on any lead; the newest is in `GET /leads/{id}/context` as `outreach`.
+  - `requested → drafting → draft_ready → approved → sending → sent`, plus `failed` / `cancelled`; one open per lead (partial unique index).
+  - A workflow with the new key scope **`outreach:process`** claims it, reads `GET /outreach/{id}/context` (lead, contact, company, exhibition, products, notes, the capture's typed note / card text / transcript / conversation, research, sender, writing rules, draft schema, delivery details incl. the WhatsApp 24-hour window) and posts `/draft`.
+  - A **person** (never a key) approves (`/approve`, with edits and a channel), sends it from their own phone (`/mark-sent`), rewrites (`/redraft` with guidance), retries or cancels. The sending workflow claims approved ones and reports `/sent` (or `/fail`); the message is logged as an outbound touchpoint (an uncontacted lead moves into conversation).
+  - A sending claim is never handed out twice (it may have gone out); a stuck send is retried by a person after the lease.
+  - Organization setting `first_touch_auto_send` (default off) approves drafts automatically, except for leads with follow-ups paused.
+- Hand-off for n8n: `HANDOFF_N8N_FIRST_TOUCH.md` (built and live).
+
+### 1i. Demo deployment and CI (20-22 Oct 2026)
+
+- **Where it runs:** API on Render (free web service, `https://leadflow-api-l39t.onrender.com`), Postgres on Neon (free, Postgres 16, `ap-southeast-1`), Redis on Upstash (free; rate-limit counters only), web app on Vercel (`https://leadflow-web-mauve.vercel.app`). Procedure and gotchas: docs/OPERATIONS.md §12.
+- **Data:** organization `refynd` (Refynd Labs) with the demo data (`seed-demo`) and real captures; all migrations up to `0009` applied.
+- **Free-tier limits:** Render sleeps after ~15 minutes idle (the first request then takes up to a minute); Neon has ~0.5 GB storage, and photos and voice notes are stored in Postgres.
+- **CI (GitHub Actions) runs on every push to `main` and is green:** tests on Postgres + ruff + `alembic check`, `pip-audit`, a full-history secret scan (gitleaks CLI; two reviewed test-password false positives in `.gitleaksignore`), and a container image build + Trivy scan. Dependabot is on.
+
 ### 1f. Later change: capture v2, lead details, notes, research (migration `0007`)
 
 - **Exhibitions:** `end_date`, `country`, `booth`, `notes`; a team per show (`event_members`, `PUT /events/{id}/members`); `GET /events/current` (what is running today, with the show to pre-select for the caller); `?timing=upcoming|ongoing|past&mine=true`; `GET /events/{id}/summary` (exhibition performance per member).
@@ -49,7 +68,7 @@ Breaking changes for anything written against the earlier version: API keys must
 
 - Phones were stored as "the last 10 digits" with India assumed, so a foreign buyer's country code was lost (+65 9123 4567 became 6591234567, and a WhatsApp follow-up could go to +91 6591234567). They are now stored in **E.164** (`+6591234567`) using the `phonenumbers` library.
 - A number without a country code is read as a local number of the organization's country: new organization setting **`default_phone_region`** (`PATCH /organization`, two-letter code; deployment default `DEFAULT_PHONE_REGION=IN`). WhatsApp sender ids (digits with the country code but no `+`) are read as international on ingest.
-- Two numbers in one field (a card) keep the first; something that is not a phone number is kept as bare digits rather than dropped. Matching compares E.164, so the same person matches however the number was written; two countries that share the last digits are now two people.
+- Two numbers in one field (a card) keep the first (since `0009` the capture review makes the second the contact's alternate number); something that is not a phone number is kept as bare digits rather than dropped. Matching compares E.164, so the same person matches however the number was written; two countries that share the last digits are now two people.
 - Existing 10-digit numbers were given `+91` by the migration (correct for everything stored so far; a foreign number already cut to 10 digits by the old rule cannot be recovered). The downgrade converts back.
 - `/leads/match?phone=` reads a number without `+` with the organization's country: callers that have a WhatsApp id must add the `+` (see the n8n brief).
 
@@ -83,10 +102,10 @@ app/schemas/*.py       Pydantic request/response models (unknown fields are reje
 app/core/*.py          config, db, tenancy, audit, auth, permissions, security, idempotency,
                        middleware, rate_limit, logging, sentry, error handlers, startup checks
 app/cli.py             Operator commands (tenant lifecycle): runs as DB owner, never exposed over HTTP
-alembic/versions/      0001 baseline schema · 0002 RLS, grants, lookup functions, audit trigger · 0003 optional phone, lead title/summary, email cadence template · 0004 attachments and captures · 0005 `in_person` source/channel · 0006 international phone numbers · 0007 capture v2: lead details, notes, products, research, exhibition staff
+alembic/versions/      0001 baseline schema · 0002 RLS, grants, lookup functions, audit trigger · 0003 optional phone, lead title/summary, email cadence template · 0004 attachments and captures · 0005 `in_person` source/channel · 0006 international phone numbers · 0007 capture v2: lead details, notes, products, research, exhibition staff · 0008 back-of-card photo · 0009 alternate number, first touch (`lead_outreach`)
 deploy/                production compose, Caddyfile, backup/restore scripts
 docker/postgres/init/  creates the restricted runtime role for dev
-tests/                 495 tests against a real Postgres
+tests/                 517 tests against a real Postgres
 ```
 
 ## 3. Multi-tenancy: how isolation works
@@ -130,7 +149,7 @@ Pure-ASGI middleware: request IDs, security headers (HSTS in production, CSP, `n
 | Dev stack (Postgres + Redis on 127.0.0.1, restricted role created) | `docker-compose.yml`, `docker/postgres/init/` | used throughout development |
 | Production stack (Caddy TLS, private network, migrate job, read-only API container, `cap_drop: ALL`) | `deploy/docker-compose.yml`, `deploy/Caddyfile` | brought up locally, including TLS via Caddy's internal CA |
 | Backups: dump → verify → AES-256 → optional S3 → retention; weekly automatic restore test | `deploy/backup/` | backup and restore-test run and verified locally, including failure paths |
-| CI: ruff, alembic check, tests on Postgres, pip-audit; Dependabot | `.github/` | written; **never executed** on GitHub |
+| CI: ruff, alembic check, tests on Postgres, pip-audit, gitleaks secret scan, image build + Trivy; Dependabot | `.github/` | runs on every push to `main`, green |
 | Operator CLI: create/suspend/activate/export/offboard org, purge-expired | `app/cli.py` | tested |
 | Staging | same compose, another env file and project name | documented; nothing provisioned |
 
@@ -141,7 +160,7 @@ Every endpoint needs `Authorization: Bearer <access token>` or `X-API-Key: <key>
 | Area | Endpoints (permission) |
 |---|---|
 | Auth | `POST /auth/login` · `POST /auth/refresh` · `POST /auth/logout` · `POST /auth/logout-all` · `POST /auth/change-password` · `GET /auth/me` |
-| Organization | `GET /organization` (org:read) · `PATCH /organization` (org:write; name, new_lead_gap_hours, fuzzy_match_threshold, assignment_strategy) |
+| Organization | `GET /organization` (org:read) · `PATCH /organization` (org:write; name, new_lead_gap_hours, fuzzy_match_threshold, assignment_strategy, default_phone_region, business_description, website, auto_research_new_leads, first_touch_auto_send) |
 | Users | `POST/GET /users`, `GET/PATCH /users/{id}`, `POST /users/{id}/reset-password`, `POST /users/{id}/revoke-sessions` (users:read/write) |
 | API keys | `POST/GET /service-api-keys`, `DELETE /service-api-keys/{id}` (keys:manage, humans only) |
 | Audit | `GET /audit-logs` (audit:read) |
@@ -156,6 +175,7 @@ Every endpoint needs `Authorization: Bearer <access token>` or `X-API-Key: <key>
 | Events | CRUD (`events:*`) · `GET /events/current` · `PUT /events/{id}/members` (events:write) · `GET /events/{id}/summary` (stats:read) |
 | Lead lists & page | `GET /leads/overview`, `/leads/facets`, `/leads/duplicates`, `/leads/regions` (leads:read) · `GET/POST /leads/{id}/notes`, `PATCH/DELETE …/{nid}` · `GET/PUT /leads/{id}/products` |
 | Research | `POST /leads/{id}/research` (leads:write) · `GET /leads/{id}/research` (leads:read) · `GET /research`, `GET /research/{id}`, `POST …/claim`, `GET …/context`, `POST …/result`, `POST …/fail` (research:process, key) |
+| First message | `POST /leads/{id}/first-touch` (leads:write) · `GET /leads/{id}/outreach` (leads:read) · `GET /outreach/{id}` (leads:read or outreach:process) · `PATCH /outreach/{id}`, `POST …/approve`, `…/mark-sent` (people only), `…/redraft`, `…/retry`, `…/cancel` (leads:write) · `GET /outreach`, `POST …/claim`, `GET …/context`, `POST …/draft`, `…/sent`, `…/fail` (outreach:process, key) |
 | Cadences | CRUD · `GET /cadences/due` (cadences:read, key) |
 | Health | `GET /health` (liveness) · `GET /ready` (DB + Redis) |
 
@@ -186,7 +206,7 @@ Every feature in the client's "Feature Checklist" tab, **excluding the five expl
 | Catalogue and brochure library | ✅ | Already existed (`Collateral`/`CatalogueItem`), now gated to admin/manager for writes. |
 | Certification and document library | ✅ | Same as above — `Product.certifications` plus the existing `Collateral` type. |
 | AI recommendation of relevant collateral | ⛔ | The AI matching itself is out of scope (per spec). `Collateral.tags` (already existed) is the hook an n8n/AI workflow would query against. |
-| Automatically read incoming enquiries / extract requirements / pre-set qualifying questions / research buyer or contact / suggest clarification questions / recommend next action / draft first response / auto-acknowledge / human approval before sending / edit AI drafts | ⛔ | All of "AI qualification and responses" is n8n+LLM work by design (PROJECT_CONTEXT.md: "message content/templates... AI extraction prompts... live in n8n"). Where the API needed a hook, one exists: `touchpoint.content` for any AI-drafted text, `touchpoint.approved_by_user_id`/`approved_at` for the one that needed a place to record human approval. |
+| Automatically read incoming enquiries / extract requirements / pre-set qualifying questions / research buyer or contact / suggest clarification questions / recommend next action / draft first response / auto-acknowledge / human approval before sending / edit AI drafts | 🔶 | Since `0007`/`0009` the API holds the parts that need state: lead research (`lead_research`) and the first message to a new lead (`lead_outreach`: AI draft, edit, human approval, send, logged). The AI itself runs in n8n. Earlier note: | All of "AI qualification and responses" is n8n+LLM work by design (PROJECT_CONTEXT.md: "message content/templates... AI extraction prompts... live in n8n"). Where the API needed a hook, one exists: `touchpoint.content` for any AI-drafted text, `touchpoint.approved_by_user_id`/`approved_at` for the one that needed a place to record human approval. |
 | Classify leads as Hot, Warm or Cold | ✅ | `Lead.quality_tag`, now a proper enum instead of free text. `POST /leads/{id}/score` sets it — n8n/AI or a rep can call it. |
 | Custom sales pipeline | ✅ | The `LeadStatus` state machine, fully implemented (§5). |
 | Automatic lead assignment | ✅ | Round-robin (`POST /leads/{id}/assign`). |
@@ -199,7 +219,7 @@ Every feature in the client's "Feature Checklist" tab, **excluding the five expl
 | Lost-lead reason tracking | ✅ | `Lead.lost_reason`, required by the API when status → `lost`. |
 | Add multiple team members | ✅ | `POST /users` (admin-only, see §6.2). |
 | Different access for different roles | ✅ | See §6.2 — meaningfully tiered now (exec/manager/admin), not just three role labels with no enforcement. |
-| Manager approval for messages | 🔶 | `Touchpoint.approved_by_user_id`/`approved_at` exist for n8n to record this if it wants; the actual approval *gate* (holding a draft until a human clicks approve) lives in n8n/frontend, since that's where the draft exists before it's ever sent. |
+| Manager approval for messages | 🔶 | For the first message to a new lead the gate is in the API since `0009`: an AI draft waits in `lead_outreach` until a person approves it (`POST /outreach/{id}/approve`, people only), unless the organization turned on auto-send. Any user with `leads:write` can approve (not managers only). Other messages: `Touchpoint.approved_by_user_id`/`approved_at` exist for n8n to record approvals. |
 | Manager approval for quotations or pricing | ✅ | `Quotation.approval_status` + `POST .../approve` / `.../reject`, admin/manager-only. |
 | Central company email / WhatsApp integration | ⛔ | Entirely n8n/Meta/Gmail-API's job, correctly out of scope per PROJECT_CONTEXT.md's explicit boundary. |
 | Sales overview dashboard / leads by source / hot-warm-cold summary / pending follow-ups / leads with no recent activity / quotations and orders summary / exhibition performance / product-wise enquiry report | ✅ | `GET /leads/stats` (aggregate counts) + filters on `GET /leads` (`?status=`, `?source=`, `?event_id=`, `?product_id=`, etc.) + `GET /cadences/due` (pending follow-ups) give the frontend everything it needs without bespoke endpoints per chart. The dashboard UI itself is frontend work. |
@@ -214,19 +234,21 @@ Every feature in the client's "Feature Checklist" tab, **excluding the five expl
 ## 9. Verification: what was actually done, and what was not
 
 **Done (developer Windows machine, Docker Desktop):**
-- 495 automated tests pass against a real Postgres whose schema is built by the real Alembic migrations, with the API running as the restricted role. `ruff` clean, `alembic check` clean (models and migrations agree), `pip-audit` found no known vulnerabilities in dependencies.
+- 517 automated tests pass (22 Oct 2026) against a real Postgres whose schema is built by the real Alembic migrations, with the API running as the restricted role. `ruff` clean, `alembic check` clean (models and migrations agree), `pip-audit` found no known vulnerabilities in dependencies.
 - Isolation attacks (API and raw SQL), session/refresh/lockout semantics, key scoping, audit atomicity and immutability, idempotency, HTTP hardening, startup checks.
 - The production compose stack was brought up end to end (migrate → api → Caddy TLS); Redis-backed rate limiting confirmed live; concurrency races (parallel ingest of the same person, parallel refresh) confirmed to resolve correctly; encrypted backup + restore-test ran, and their failure paths fail loudly.
 - Load smoke test (2 workers, Redis, ~900 leads): reads 30-50 ms; single ingest ~34 req/s at 10 concurrent (p50 ≈ 230 ms; rare multi-second p99 outliers not root-caused); 500-row bulk ingest ≈ 12 s. An earlier, much worse reading came from the load script creating a new HTTP client per request, not from the server. One laptop is not a capacity plan.
 
+**Since then:** CI runs green on GitHub on every push; the API runs as a demo on Render/Neon/Upstash (startup checks, row-level security and the restricted role verified there; migrations applied by hand as the owner, see OPERATIONS.md §12).
+
 **Not verified. Do these before relying on them:**
-- The GitHub Actions workflow has never run.
 - Sentry has never received an event (no real DSN was available).
 - S3/B2/R2 upload has not run against a real bucket.
 - Real Let's Encrypt issuance (only Caddy's local CA was exercised); needs real DNS.
 - Multi-instance behaviour of the rate limiter with real replicas.
 - No third-party penetration test or code audit: the security work is thorough but self-reviewed.
 - Nothing has been load-tested on production-class hardware or with realistic data volumes.
+- The production Docker stack (`deploy/`: Caddy, backups, restore test) has not run on a real server. The demo uses managed free tiers instead and has **no backups beyond Neon's own** (its free-tier restore window).
 
 ## 10. Known limitations and things not built
 
@@ -252,4 +274,4 @@ Every feature in the client's "Feature Checklist" tab, **excluding the five expl
 
 ## 11. Running it
 
-See [docs/OPERATIONS.md](docs/OPERATIONS.md) §11 for local development and §2 for production. Nothing has been committed to git; the repository has no commits yet.
+See [docs/OPERATIONS.md](docs/OPERATIONS.md) §11 for local development, §2 for the production Docker stack and §12 for the current demo deployment. The code is on GitHub (`RefyndLabs/leadflow-api`, branch `main`).

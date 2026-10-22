@@ -2,7 +2,7 @@
 
 The sales team's UI for the Leadflow API: leads and conversations, follow-ups, catalog, exhibitions, and the admin area. Next.js (App Router) + TypeScript, Tailwind, TanStack Query, React Hook Form + Zod. The visual design is a deliberately quiet placeholder; the functionality is meant to be complete.
 
-Read alongside `PROJECT_CONTEXT.md` (product), `PROJECT_STATUS.md` (API), `FRONTEND_BUILD_GUIDE.md` (API contract) and `LEADFLOW_UI_SPEC.md` (n8n boundary).
+Read alongside `PROJECT_CONTEXT.md` (product), `PROJECT_STATUS.md` (API) and, in the API repo, `STATUS_UI.md` (the app's status and the API contract it uses). Deployed on Vercel from `main`: `https://leadflow-web-mauve.vercel.app`, against the API on Render.
 
 ## Run it
 
@@ -22,8 +22,8 @@ pnpm mock-api                     # http://127.0.0.1:4010 — API_URL=http://127
 | Script | What it does |
 |---|---|
 | `pnpm check` | typecheck + lint + unit tests |
-| `pnpm test` | Vitest (162 tests: schema drift vs `openapi.json`, gateway allow-list, CSRF, session, refresh single-flight, lead-list URL → query, parsing) |
-| `pnpm build && pnpm test:e2e` | Playwright against the production build and the mock API (desktop + phone, light + dark, axe accessibility on every route) |
+| `pnpm test` | Vitest (181 tests: schema drift vs `openapi.json`, gateway allow-list, CSRF, session, refresh single-flight, lead-list URL → query, parsing, contact cards) |
+| `pnpm build && pnpm test:e2e` | Playwright against the production build and the mock API (51 tests: desktop + phone, light + dark, axe accessibility on every route) |
 | `pnpm gen:api` | regenerate `src/lib/api/schema.d.ts` from `openapi.json` |
 
 Environment (`.env.example` lists all of it): `API_URL` and `SESSION_SECRET` are required; `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN` enable error tracking. **`API_URL` is server-only** — the browser never learns the API's address.
@@ -34,7 +34,7 @@ Environment (`.env.example` lists all of it): `API_URL` and `SESSION_SECRET` are
 Browser ── same-origin, httpOnly cookie ──▶ Next.js server ── Authorization: Bearer ──▶ Leadflow API
                                             /api/auth/*  login, logout
                                             /api/lf/*    allow-listed gateway to the API
-                                            /api/captures/*  streams card photo / voice uploads to the API
+                                            /api/captures/*  streams card photo (front, back) / voice uploads to the API
                                             /api/attachments/* streams stored photos and recordings back (Range supported)
 ```
 
@@ -70,16 +70,23 @@ Grounded in the `apple-design` skill (web app, so principles and foundations app
    - **Booth screen** pre-selects a show from `/events/current` (a link's `?event=` wins, then a remembered show that is still on, then the API's suggestion). Exhibitions have Ongoing/Upcoming/Past tabs, a team, and a detail page (`/events/[id]`) with the performance summary.
    - **Mock API** (`e2e/mock-api`) implements all of this and rejects unknown body keys against `openapi.json`, like the real API, so e2e fails if the UI sends a field the API doesn't know. `POST /__research/{leadId}` is a mock-only hook to put research into a state.
    - **Tinted badges** are contrast-checked on white surfaces only; on the grey page background (headers) use plain coloured text (see `TimingBadge plain`).
-2. **Message templates have no API**; they live in n8n. Follow-up rules store only the template ID, and the screen says so.
+1b. **Alternate number, WhatsApp default, first message, Save contact (API migration 0009).**
+   - A card's second number becomes the contact's **Alternate number** (capture review, contact and enquiry forms, lead and contact pages). On the review screen **WhatsApp** is pre-filled with the main number and follows it until someone types a different one.
+   - **First message** card on the lead page (`first-touch.tsx`): when a show capture is confirmed as a new lead (checkbox on the review screen, on by default), n8n's AI writes a personal WhatsApp message and email. The rep sees what it is personalised on and what to check, edits it, and either approves it (n8n sends it) or sends it from their own WhatsApp / email app (`wa.me` / `mailto:` with the text filled in, then a confirm that logs it as sent). *Write it again* takes guidance; *Discard*; failed and stuck sends have Retry. The page polls while it is written or sent. Settings → Organization → *First messages* switches on sending without review. The gateway lets through only the person-facing `/outreach/{id}` actions.
+   - **Save contact** (`save-contact.tsx`, `src/lib/vcard.ts`) on the lead and contact pages. iPhone and computers get a vCard 3.0 file. On Android it tries an `intent:` link to Contacts' "new contact" screen. **That doesn't work:** Chrome only opens apps that accept browser links, and that screen doesn't, so the rep falls back to the offered `.vcf` download. To be fixed (see `STATUS_UI.md` §5).
+   - Mock API: `POST /__outreach/{leadId}` puts a lead's first message into a state (plays the n8n writer in e2e).
+2. **Message templates have no API**; they live in n8n. Follow-up rules store only the template ID, and the screen says so. (The first message to a new lead is written per lead by AI, not from a template.)
 3. **Contact and company lists have no search.** The API only paginates them, so contact/company search scans the newest 200 and says so; "needs review" companies are found the same way. Leads (`/leads/overview?q=`) and products (`/products?q=`) do have server search now.
 4. **No account merge endpoint**, so a flagged duplicate company shows a side-by-side comparison and explains the manual route.
 5. `/leads/stats` is untyped in OpenAPI; the shape from the build guide is used (`src/lib/api/types.ts`).
 6. **Rate limits are shared.** Behind this app every user of an organization shares the API's per-IP bucket unless the API is configured to trust this app's `X-Forwarded-For` (guide §2.2).
 7. **One frontend instance is assumed** for the refresh lock. Before scaling out, swap the in-process `inflight` map in `src/lib/server/gateway.ts` for a Redis lock keyed by the same hash.
-8. Verified only against the mock API (it implements the capture contract): real-phone camera/mic behaviour on iPhone Safari and Android Chrome, Safari audio seeking, and Sentry with a real DSN. The brief's definition-of-done checklist for those needs a real phone over HTTPS. Everything else runs in tests against the mock API, and `openapi.json` is refreshed from the live API.
+8. Verified only against the mock API (it implements the capture contract): real-phone camera/mic behaviour on iPhone Safari and Android Chrome, Safari audio seeking, and Sentry with a real DSN. (Since the Vercel deployment the team has used capture, the first message and Save contact on real phones; Save contact fails on Android as described in 1b.) The brief's definition-of-done checklist for those needs a real phone over HTTPS. Everything else runs in tests against the mock API, and `openapi.json` is refreshed from the live API.
 
 ## Deploy
 
-`docker-compose.example.yml` shows the container on the API's private network (`API_URL=http://api:8000`), read-only, all capabilities dropped. `docker build .` produces a standalone, non-root image with a `/api/health` healthcheck. Serve it over HTTPS (the session cookie is `Secure` in production; set `SESSION_COOKIE_SECURE=false` only to test a production build over plain http).
+**Today:** Vercel, building `main` on every push (environment: `API_URL`, `SESSION_SECRET`, `ENABLE_EXPERIMENTAL_COREPACK=1`). When an API change adds endpoints the app calls, deploy the API first, then the app.
+
+**Self-hosted:** `docker-compose.example.yml` shows the container on the API's private network (`API_URL=http://api:8000`), read-only, all capabilities dropped. `docker build .` produces a standalone, non-root image with a `/api/health` healthcheck. Serve it over HTTPS (the session cookie is `Secure` in production; set `SESSION_COOKIE_SECURE=false` only to test a production build over plain http).
 
 When the API changes: re-export `openapi.json`, run `pnpm gen:api && pnpm test`. The drift test names every field that moved.
