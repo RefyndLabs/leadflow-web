@@ -31,6 +31,9 @@ function formValues(org: Organization) {
     website: org.website ?? "",
     auto_research_new_leads: org.auto_research_new_leads ?? false,
     first_touch_auto_send: org.first_touch_auto_send ?? false,
+    error_alert_email: org.error_alert_email ?? "",
+    exhibition_reviewer_email: org.exhibition_reviewer_email ?? "",
+    handoff_email: org.handoff_email ?? "",
   };
 }
 
@@ -177,6 +180,50 @@ function SettingsForm({
               </span>
             </span>
           </label>
+        </div>
+        <div className="space-y-4 border-t border-line pt-5">
+          <div>
+            <h3 className="text-[15px] font-semibold">Notifications</h3>
+            <p className="text-[13px] text-muted">
+              Where the automation sends emails. Leave a box empty to send nothing of that kind.
+            </p>
+          </div>
+          <Field
+            label="Show leads to review"
+            error={errors.exhibition_reviewer_email?.message as string | undefined}
+            hint="Gets each lead captured at a show once it has been read, so someone can check and confirm it."
+          >
+            <Input
+              type="email"
+              autoCapitalize="none"
+              maxLength={320}
+              {...form.register("exhibition_reviewer_email")}
+            />
+          </Field>
+          <Field
+            label="Conversations handed to a person"
+            error={errors.handoff_email?.message as string | undefined}
+            hint="Gets a message when the WhatsApp assistant stops and asks a person to take over a chat."
+          >
+            <Input
+              type="email"
+              autoCapitalize="none"
+              maxLength={320}
+              {...form.register("handoff_email")}
+            />
+          </Field>
+          <Field
+            label="Automation problems"
+            error={errors.error_alert_email?.message as string | undefined}
+            hint="Gets an alert when an automated step fails, for example a message that could not be sent."
+          >
+            <Input
+              type="email"
+              autoCapitalize="none"
+              maxLength={320}
+              {...form.register("error_alert_email")}
+            />
+          </Field>
         </div>
       </fieldset>
       {canWrite ? (

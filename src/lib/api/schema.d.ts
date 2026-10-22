@@ -2120,6 +2120,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/integrations/orgs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Integration Orgs
+         * @description Every active organization the automation is switched on for: what the
+         *     scheduled workflows loop over.
+         */
+        get: operations["list_integration_orgs_integrations_orgs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/integrations/orgs/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Integration Org
+         * @description One organization's automation settings (e.g. where the error handler
+         *     sends an alert). Suspended organizations are returned too, flagged, so an
+         *     alert about one can still be delivered.
+         */
+        get: operations["get_integration_org_integrations_orgs__slug__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3420,6 +3463,31 @@ export interface components {
             /** Raw Source Ref */
             raw_source_ref?: string | null;
         };
+        /**
+         * IntegrationOrgRead
+         * @description What the automation needs to know about an organization it works for.
+         */
+        IntegrationOrgRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Slug */
+            slug: string;
+            /** Name */
+            name: string;
+            /** Is Active */
+            is_active: boolean;
+            /** Default Phone Region */
+            default_phone_region: string | null;
+            /** Error Alert Email */
+            error_alert_email: string | null;
+            /** Exhibition Reviewer Email */
+            exhibition_reviewer_email: string | null;
+            /** Handoff Email */
+            handoff_email: string | null;
+        };
         /** LastInbound */
         LastInbound: {
             /** Whatsapp */
@@ -4156,6 +4224,17 @@ export interface components {
             auto_research_new_leads?: boolean | null;
             /** First Touch Auto Send */
             first_touch_auto_send?: boolean | null;
+            /**
+             * Integration Enabled
+             * @default false
+             */
+            integration_enabled: boolean;
+            /** Error Alert Email */
+            error_alert_email?: string | null;
+            /** Exhibition Reviewer Email */
+            exhibition_reviewer_email?: string | null;
+            /** Handoff Email */
+            handoff_email?: string | null;
         };
         /**
          * OrganizationUpdate
@@ -4180,6 +4259,12 @@ export interface components {
             auto_research_new_leads?: boolean | null;
             /** First Touch Auto Send */
             first_touch_auto_send?: boolean | null;
+            /** Error Alert Email */
+            error_alert_email?: string | null;
+            /** Exhibition Reviewer Email */
+            exhibition_reviewer_email?: string | null;
+            /** Handoff Email */
+            handoff_email?: string | null;
         };
         /**
          * OutreachApprove
@@ -9810,6 +9895,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OutreachRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_integration_orgs_integrations_orgs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationOrgRead"][];
+                };
+            };
+        };
+    };
+    get_integration_org_integrations_orgs__slug__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationOrgRead"];
                 };
             };
             /** @description Validation Error */

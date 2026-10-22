@@ -769,6 +769,10 @@ export const organizationUpdate = z.strictObject({
   website: optionalWebsiteNull().optional(),
   auto_research_new_leads: z.boolean().optional(),
   first_touch_auto_send: z.boolean().optional(),
+  /** Who the automation emails: workflow failures, show leads waiting for review, bot hand-offs. */
+  error_alert_email: optionalEmailNull.optional(),
+  exhibition_reviewer_email: optionalEmailNull.optional(),
+  handoff_email: optionalEmailNull.optional(),
 });
 
 export const researchRequest = z.strictObject({
