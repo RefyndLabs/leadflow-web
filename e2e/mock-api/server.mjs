@@ -8,6 +8,7 @@ import { createServer } from "node:http";
 import { randomUUID, randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { parsePhoneNumberFromString } from "libphonenumber-js";
+import { handlePlatform } from "./platform.mjs";
 
 const PORT = Number(process.env.MOCK_PORT ?? 4010);
 const EXPIRES_IN = Number(process.env.MOCK_EXPIRES_IN ?? 900);
@@ -1226,6 +1227,8 @@ ${run.email_body}`,
     r.used = true;
     return json(res, 200, issue(r.sid));
   }
+
+  if (await handlePlatform(req, res, path, method, url, { json, readBody })) return;
 
   const a = auth(req);
   if (!a) return json(res, 401, { detail: "Not authenticated" });

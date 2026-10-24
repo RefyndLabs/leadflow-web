@@ -8,6 +8,7 @@ import { NextResponse, type NextRequest } from "next/server";
  */
 const SESSION_COOKIES = ["__Host-lf_session", "lf_session"];
 const PUBLIC_PATHS = new Set(["/login"]);
+const PLATFORM_COOKIES = ["__Host-lf_platform", "lf_platform"];
 
 function originOf(value: string | undefined): string | null {
   if (!value) return null;
@@ -46,8 +47,21 @@ function buildCsp(nonce: string): string {
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // The platform console has its own cookie and sign-in page; a customer session never opens it.
+  const isPlatform =
+    pathname === "/platform" || pathname.startsWith("/platform/");
+  if (isPlatform) {
+    const hasPlatform = PLATFORM_COOKIES.some((n) => request.cookies.has(n));
+    if (!hasPlatform && pathname !== "/platform/login") {
+      const url = request.nextUrl.clone();
+      url.pathname = "/platform/login";
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
+  }
+
   const hasSession = SESSION_COOKIES.some((name) => request.cookies.has(name));
-  if (!hasSession && !PUBLIC_PATHS.has(pathname)) {
+  if (!isPlatform && !hasSession && !PUBLIC_PATHS.has(pathname)) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.search = "";

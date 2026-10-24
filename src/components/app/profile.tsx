@@ -80,7 +80,7 @@ function Appearance() {
   );
 }
 
-function ChangePassword() {
+export function ChangePassword({ onChanged }: { onChanged?: () => void } = {}) {
   const { banner, setBanner, clear } = useFormBanner();
   const [confirmValue, setConfirmValue] = React.useState("");
   const [mismatch, setMismatch] = React.useState(false);
@@ -102,6 +102,7 @@ function ChangePassword() {
       toast.success("Password changed");
       form.reset();
       setConfirmValue("");
+      onChanged?.();
     } catch (e) {
       // 400 = wrong current password; 422 = policy, with a human-readable reason — shown as written.
       setBanner(applyApiError(form as never, e));

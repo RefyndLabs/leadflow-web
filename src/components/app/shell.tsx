@@ -25,6 +25,7 @@ import { initials } from "@/lib/format";
 import { ROLE_LABEL } from "@/lib/enums";
 import { cn } from "@/lib/utils";
 import { AuthProvider, useAuth } from "./auth";
+import { ChangePassword } from "./profile";
 import { ACCOUNT_ITEMS, NAV, TAB_HREFS, isActive, type NavItem } from "./nav";
 
 function useVisibleNav() {
@@ -295,6 +296,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
+
+  // A temporary password a platform admin set: the person chooses their own first.
+  if (q.data.must_change_password)
+    return (
+      <AuthProvider me={q.data}>
+        <main id="main" className="mx-auto max-w-lg px-4 py-10">
+          <h1 className="mb-2 text-[26px] font-semibold tracking-tight">
+            Choose your own password
+          </h1>
+          <p className="mb-5 text-[14px] text-muted">
+            You signed in with a temporary password. Type it as the current
+            password, then choose a new one.
+          </p>
+          <ChangePassword onChanged={() => void q.refetch()} />
+        </main>
+      </AuthProvider>
+    );
 
   return (
     <AuthProvider me={q.data}>
