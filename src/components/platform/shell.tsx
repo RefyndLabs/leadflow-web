@@ -19,13 +19,17 @@ import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { ErrorState, InlineAlert, Skeleton } from "@/components/ui/feedback";
 import { Field } from "@/components/ui/field";
 import { PasswordInput } from "@/components/ui/input";
+import { FreshCodeField, useFreshCode } from "./fresh-code";
 
 const NAV = [
   { href: "/platform", label: "Organizations" },
   { href: "/platform/admins", label: "Platform admins" },
   { href: "/platform/keys", label: "Automation keys" },
   { href: "/platform/activity", label: "Activity log" },
+  { href: "/platform/settings", label: "Settings" },
 ] as const;
+
+export const PLATFORM_ROLE_LABEL = { owner: "Owner", staff: "Staff" } as const;
 
 function isActive(pathname: string, href: string) {
   if (href === "/platform")
@@ -45,12 +49,16 @@ export async function platformSignOut() {
   window.location.assign("/platform/login?reason=signed-out");
 }
 
-/** Change the platform admin's own password (forced while it is a temporary one). */
+/**
+ * Change the platform admin's own password (forced while it is a temporary
+ * one). Needs a fresh authenticator code as well.
+ */
 export function PlatformChangePassword({ forced }: { forced?: boolean }) {
   const qc = useQueryClient();
   const [current, setCurrent] = React.useState("");
   const [next, setNext] = React.useState("");
   const [again, setAgain] = React.useState("");
+  const code = useFreshCode();
   const [error, setError] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
 
@@ -62,19 +70,16 @@ export function PlatformChangePassword({ forced }: { forced?: boolean }) {
     try {
       await platformApi<void>("/auth/change-password", {
         method: "POST",
-        body: { current_password: current, new_password: next },
+        body: { current_password: current, new_password: next, ...code.body() },
       });
       setCurrent("");
       setNext("");
       setAgain("");
+      code.reset();
       toast.success("Password changed");
       await qc.invalidateQueries({ queryKey: platformKeys.me });
     } catch (err) {
-      setError(
-        err instanceof ApiError && err.status === 401
-          ? "The current password is wrong."
-          : describeError(err),
-      );
+      setError(describeError(err));
     } finally {
       setBusy(false);
     }
@@ -127,11 +132,12 @@ export function PlatformChangePassword({ forced }: { forced?: boolean }) {
               onChange={(e) => setAgain(e.target.value)}
             />
           </Field>
+          <FreshCodeField state={code} />
           <div className="flex justify-end">
             <Button
               type="submit"
               loading={busy}
-              disabled={!current || !next || !again}
+              disabled={!current || !next || !again || !code.ready}
             >
               Change password
             </Button>
@@ -193,7 +199,9 @@ export function PlatformShell({ children }: { children: React.ReactNode }) {
             </nav>
           )}
           <div className="ml-auto flex items-center gap-2 text-[13px] text-muted">
-            <span className="hidden sm:inline">{me.data.email}</span>
+            <span className="hidden sm:inline">
+              {me.data.email} · {PLATFORM_ROLE_LABEL[me.data.role]}
+            </span>
             <Button
               variant="ghost"
               size="sm"

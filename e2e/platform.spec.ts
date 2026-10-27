@@ -132,6 +132,144 @@ test.describe("platform console", () => {
     await expect(page.getByText("Suspended the organization")).toBeVisible();
   });
 
+  test("deleting: schedule with the slug and a fresh code, cancel, then delete after the wait", async ({
+    page,
+  }) => {
+    await platformSignIn(page);
+    await page.goto("/platform/organizations/beta-foods");
+    const card = page.getByText("Delete organization", { exact: true });
+    await expect(card).toBeVisible();
+
+    await page.getByRole("button", { name: "Schedule deletion" }).click();
+    const dialog = page.getByRole("dialog");
+    const go = dialog.getByRole("button", { name: "Schedule deletion" });
+    await dialog.getByLabel("Type beta-foods to confirm").fill("beta-foods");
+    await expect(go).toBeDisabled(); // no code yet
+    await dialog.getByLabel("Authenticator code").fill("000000");
+    await go.click();
+    await expect(
+      dialog.getByText(/code is wrong or was already used/),
+    ).toBeVisible();
+    await dialog.getByLabel("Authenticator code").fill(CODE);
+    await go.click();
+    await expect(page.getByText(/It can be deleted from/)).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Delete permanently" }),
+    ).toBeDisabled();
+
+    await page.getByRole("button", { name: "Cancel deletion" }).click();
+    await page.getByRole("button", { name: "Cancel deletion" }).last().click();
+    await expect(
+      page.getByRole("button", { name: "Schedule deletion" }),
+    ).toBeVisible();
+
+    await page.getByRole("button", { name: "Schedule deletion" }).click();
+    await dialog.getByLabel("Type beta-foods to confirm").fill("beta-foods");
+    await dialog.getByLabel("Authenticator code").fill(CODE);
+    await dialog.getByRole("button", { name: "Schedule deletion" }).click();
+    await expect(page.getByText(/It can be deleted from/)).toBeVisible();
+
+    // The 7 days pass (mock-only hook).
+    const due = await page.request.post(
+      "http://127.0.0.1:4010/__platform/due/beta-foods",
+    );
+    expect(due.ok()).toBe(true);
+    await page.reload();
+    await page.getByRole("button", { name: "Delete permanently" }).click();
+    await dialog.getByLabel("Type beta-foods to confirm").fill("beta-foods");
+    await dialog.getByLabel("Authenticator code").fill(CODE);
+    await dialog.getByRole("button", { name: "Delete permanently" }).click();
+    await expect(page).toHaveURL(/\/platform$/);
+    await expect(page.getByRole("link", { name: /Beta Foods/ })).toHaveCount(0);
+  });
+
+  test("platform admins: add staff, make an owner with a fresh code, make staff again", async ({
+    page,
+  }) => {
+    await platformSignIn(page);
+    await page.getByRole("link", { name: "Platform admins" }).click();
+    await page.getByRole("button", { name: "Add platform admin" }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByLabel("Name").fill("Sam Staff");
+    await dialog.getByLabel("Email").fill("sam@gmail.com");
+    await dialog.getByRole("button", { name: "Add" }).click();
+    await expect(
+      dialog.getByText(/must use an email address ending in/),
+    ).toBeVisible();
+    await dialog.getByLabel("Email").fill("sam@example.com");
+    await dialog.getByRole("button", { name: "Add" }).click();
+    await page.getByRole("button", { name: "Done" }).click();
+
+    const row = page.getByRole("listitem").filter({ hasText: "Sam Staff" });
+    await expect(row.getByText("Staff", { exact: true })).toBeVisible();
+    await row.getByRole("button", { name: "Make owner" }).click();
+    await dialog.getByLabel("Authenticator code").fill(CODE);
+    await dialog.getByRole("button", { name: "Make owner" }).click();
+    await expect(row.getByText("Owner", { exact: true })).toBeVisible();
+
+    // A forgotten password: the reset needs your own fresh code too.
+    await row.getByRole("button", { name: "Reset password" }).click();
+    await expect(
+      dialog.getByRole("button", { name: "Reset password" }),
+    ).toBeDisabled();
+    await dialog.getByLabel("Authenticator code").fill(CODE);
+    await dialog.getByRole("button", { name: "Reset password" }).click();
+    await expect(page.getByText(/^Temp-/)).toBeVisible();
+    await page.getByRole("button", { name: "Done" }).click();
+
+    await row.getByRole("button", { name: "Make staff" }).click();
+    await page.getByRole("button", { name: "Make staff" }).last().click();
+    await expect(row.getByText("Staff", { exact: true })).toBeVisible();
+  });
+
+  test("settings: change password with a fresh code, new recovery codes, sessions", async ({
+    page,
+  }) => {
+    await platformSignIn(page);
+    await page.getByRole("link", { name: "Settings" }).click();
+    await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+    await expect(page.getByText("Match device")).toBeVisible();
+
+    await page.getByRole("radio", { name: "Dark" }).click();
+    expect(
+      await page.evaluate(() => document.documentElement.dataset.theme),
+    ).toBe("dark");
+    await page.getByRole("radio", { name: "Match device" }).click();
+
+    const password = page
+      .locator("form")
+      .filter({ has: page.getByLabel("Current password") });
+    await password.getByLabel("Current password").fill(OPS_PASSWORD);
+    await password.getByLabel("New password").first().fill("x".repeat(14));
+    await password.getByLabel("New password again").fill("x".repeat(14));
+    const change = password.getByRole("button", { name: "Change password" });
+    await expect(change).toBeDisabled();
+    await password.getByLabel("Authenticator code").fill(CODE);
+    await change.click();
+    await expect(page.getByText("Password changed")).toBeVisible();
+
+    const twoStep = page
+      .locator("form")
+      .filter({ hasText: "Make ten new ones" });
+    await twoStep.getByLabel("Authenticator code").fill(CODE);
+    await twoStep
+      .getByRole("button", { name: "Make new recovery codes" })
+      .click();
+    await expect(page.getByText("newer-code00")).toBeVisible();
+    await page.getByRole("button", { name: "I have saved them" }).click();
+
+    await expect(page.getByText("This device", { exact: true })).toBeVisible();
+    await expect(page.getByText("Chrome on Windows").first()).toBeVisible();
+    await page
+      .getByRole("button", { name: "Sign out everywhere else" })
+      .click();
+    await page.getByRole("button", { name: "Sign out others" }).click();
+    await expect(page.getByText("Chrome on Windows")).toHaveCount(1);
+    await expect(
+      page.getByRole("button", { name: "Sign out everywhere else" }),
+    ).toBeDisabled();
+  });
+
   test("signing out ends the console session", async ({ page }) => {
     await platformSignIn(page);
     await page.getByRole("button", { name: "Sign out" }).click();

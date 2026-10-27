@@ -2422,8 +2422,68 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Change Password */
+        /**
+         * Change Password
+         * @description Needs a fresh authenticator code too (the one used to sign in is spent).
+         */
         post: operations["change_password_platform_auth_change_password_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/auth/recovery-codes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * New Recovery Codes
+         * @description Ten new one-time recovery codes, shown once; the old ones stop working.
+         */
+        post: operations["new_recovery_codes_platform_auth_recovery_codes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/auth/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Sessions
+         * @description Where you are signed in right now.
+         */
+        get: operations["list_sessions_platform_auth_sessions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/auth/sessions/end-others": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** End Other Sessions */
+        post: operations["end_other_sessions_platform_auth_sessions_end_others_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2497,8 +2557,54 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Activate Organization */
+        /**
+         * Activate Organization
+         * @description Also cancels a scheduled deletion.
+         */
         post: operations["activate_organization_platform_organizations__slug__activate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/organizations/{slug}/deletion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Schedule Deletion
+         * @description Step 1 of 2, for a suspended organization: it can be deleted 7 days from
+         *     now. Any owner can cancel until then (and reactivating cancels).
+         */
+        post: operations["schedule_deletion_platform_organizations__slug__deletion_post"];
+        /** Cancel Deletion */
+        delete: operations["cancel_deletion_platform_organizations__slug__deletion_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/organizations/{slug}/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Delete Organization
+         * @description Step 2 of 2, once the waiting period is over: PERMANENTLY deletes the
+         *     organization and all its data. Older backups still hold it until they expire.
+         */
+        post: operations["delete_organization_platform_organizations__slug__delete_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2609,7 +2715,8 @@ export interface paths {
         /**
          * Reset User Password
          * @description A temporary password, shown once; the user is signed out everywhere and
-         *     asked for a new password at their next login.
+         *     asked for a new password at their next login. Owners only: whoever sees the
+         *     temporary password could sign in as that user.
          */
         post: operations["reset_user_password_platform_organizations__slug__users__user_id__reset_password_post"];
         delete?: never;
@@ -2647,7 +2754,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Revoke Integration Key */
+        /**
+         * Revoke Integration Key
+         * @description Owners only: it stops the automation for every organization at once.
+         */
         post: operations["revoke_integration_key_platform_integration_keys__key_id__revoke_post"];
         delete?: never;
         options?: never;
@@ -2668,9 +2778,30 @@ export interface paths {
         /**
          * Create Admin
          * @description They sign in with the temporary password, choose their own, and set up
-         *     their authenticator.
+         *     their authenticator. Making an owner needs your fresh authenticator code.
          */
         post: operations["create_admin_platform_admins_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/admins/{admin_id}/role": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Admin Role
+         * @description Promote (needs your fresh authenticator code) or demote. There is always
+         *     at least one active owner.
+         */
+        put: operations["set_admin_role_platform_admins__admin_id__role_put"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -5218,6 +5349,10 @@ export interface components {
         Permission: "leads:read" | "leads:write" | "leads:ingest" | "leads:sweep" | "stats:read" | "touchpoints:write" | "quotations:read" | "quotations:write" | "quotations:approve" | "samples:read" | "samples:write" | "accounts:read" | "accounts:write" | "accounts:delete" | "contacts:read" | "contacts:write" | "contacts:delete" | "catalog:read" | "catalog:write" | "events:read" | "events:write" | "cadences:read" | "cadences:write" | "users:read" | "users:write" | "keys:manage" | "audit:read" | "org:read" | "org:write" | "captures:read" | "captures:write" | "captures:process" | "research:process" | "outreach:process" | "whatsapp:send";
         /** PlatformAdminCreate */
         PlatformAdminCreate: {
+            /** Code */
+            code?: string | null;
+            /** Recovery Code */
+            recovery_code?: string | null;
             /** Name */
             name: string;
             /**
@@ -5225,6 +5360,12 @@ export interface components {
              * Format: email
              */
             email: string;
+            /**
+             * Role
+             * @default staff
+             * @enum {string}
+             */
+            role: "owner" | "staff";
         };
         /** PlatformAdminCreated */
         PlatformAdminCreated: {
@@ -5243,6 +5384,11 @@ export interface components {
             name: string;
             /** Email */
             email: string;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "owner" | "staff";
             /** Is Active */
             is_active: boolean;
             /** Mfa Enabled */
@@ -5301,10 +5447,38 @@ export interface components {
         };
         /** PlatformChangePasswordRequest */
         PlatformChangePasswordRequest: {
+            /** Code */
+            code?: string | null;
+            /** Recovery Code */
+            recovery_code?: string | null;
             /** Current Password */
             current_password: string;
             /** New Password */
             new_password: string;
+        };
+        /**
+         * PlatformDeleteRequest
+         * @description Scheduling a deletion and confirming it both need the slug typed again
+         *     and a fresh authenticator code.
+         */
+        PlatformDeleteRequest: {
+            /** Code */
+            code?: string | null;
+            /** Recovery Code */
+            recovery_code?: string | null;
+            /** Confirm Slug */
+            confirm_slug: string;
+        };
+        /**
+         * PlatformFreshCode
+         * @description A fresh authenticator code (or one recovery code) for what a session
+         *     alone may not do. The code used to sign in has been spent: use the next one.
+         */
+        PlatformFreshCode: {
+            /** Code */
+            code?: string | null;
+            /** Recovery Code */
+            recovery_code?: string | null;
         };
         /** PlatformIntegrationKey */
         PlatformIntegrationKey: {
@@ -5359,6 +5533,11 @@ export interface components {
             name: string;
             /** Email */
             email: string;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "owner" | "staff";
             /** Must Change Password */
             must_change_password: boolean;
             /** Mfa Enabled */
@@ -5397,6 +5576,15 @@ export interface components {
             /** Temporary Password */
             temporary_password: string;
         };
+        /** PlatformOrgDeleted */
+        PlatformOrgDeleted: {
+            /** Slug */
+            slug: string;
+            /** Rows Deleted */
+            rows_deleted: {
+                [key: string]: number;
+            };
+        };
         /** PlatformOrgDetail */
         PlatformOrgDetail: {
             /**
@@ -5429,6 +5617,8 @@ export interface components {
             leads_total: number;
             /** Last Login At */
             last_login_at: string | null;
+            /** Deletion Due At */
+            deletion_due_at: string | null;
             /** Error Alert Email */
             error_alert_email: string | null;
             /** Exhibition Reviewer Email */
@@ -5439,6 +5629,10 @@ export interface components {
             default_phone_region: string | null;
             /** Website */
             website: string | null;
+            /** Deletion Scheduled At */
+            deletion_scheduled_at: string | null;
+            /** Deletion Scheduled By */
+            deletion_scheduled_by: string | null;
         };
         /** PlatformOrgSummary */
         PlatformOrgSummary: {
@@ -5472,6 +5666,8 @@ export interface components {
             leads_total: number;
             /** Last Login At */
             last_login_at: string | null;
+            /** Deletion Due At */
+            deletion_due_at: string | null;
         };
         /** PlatformOrgUser */
         PlatformOrgUser: {
@@ -5498,6 +5694,57 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+        };
+        /** PlatformRecoveryCodes */
+        PlatformRecoveryCodes: {
+            /** Recovery Codes */
+            recovery_codes: string[];
+        };
+        /** PlatformRecoveryCodesRequest */
+        PlatformRecoveryCodesRequest: {
+            /** Code */
+            code: string;
+        };
+        /** PlatformRoleUpdate */
+        PlatformRoleUpdate: {
+            /** Code */
+            code?: string | null;
+            /** Recovery Code */
+            recovery_code?: string | null;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "owner" | "staff";
+        };
+        /** PlatformSessionRead */
+        PlatformSessionRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Last Used At
+             * Format: date-time
+             */
+            last_used_at: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Ip Address */
+            ip_address: string | null;
+            /** User Agent */
+            user_agent: string | null;
+            /** Current */
+            current: boolean;
         };
         /** PlatformSuspendRequest */
         PlatformSuspendRequest: {
@@ -11735,6 +11982,77 @@ export interface operations {
             };
         };
     };
+    new_recovery_codes_platform_auth_recovery_codes_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlatformRecoveryCodesRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformRecoveryCodes"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_sessions_platform_auth_sessions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformSessionRead"][];
+                };
+            };
+        };
+    };
+    end_other_sessions_platform_auth_sessions_end_others_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     list_organizations_platform_organizations_get: {
         parameters: {
             query?: never;
@@ -11872,6 +12190,107 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PlatformOrgDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    schedule_deletion_platform_organizations__slug__deletion_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlatformDeleteRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformOrgDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_deletion_platform_organizations__slug__deletion_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformOrgDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_organization_platform_organizations__slug__delete_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlatformDeleteRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformOrgDeleted"];
                 };
             };
             /** @description Validation Error */
@@ -12216,6 +12635,41 @@ export interface operations {
             };
         };
     };
+    set_admin_role_platform_admins__admin_id__role_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                admin_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlatformRoleUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformAdminRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     deactivate_admin_platform_admins__admin_id__deactivate_post: {
         parameters: {
             query?: never;
@@ -12287,7 +12741,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlatformFreshCode"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -12318,7 +12776,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlatformFreshCode"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

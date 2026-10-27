@@ -75,6 +75,8 @@ const ORG_ACTIONS = new Set([
   "notifications",
   "whatsapp",
   "users",
+  "deletion",
+  "delete",
 ]);
 const ORG_USER_ACTIONS = new Set(["unlock", "reset-password"]);
 const ADMIN_ACTIONS = new Set([
@@ -82,6 +84,14 @@ const ADMIN_ACTIONS = new Set([
   "activate",
   "reset-password",
   "reset-mfa",
+  "role",
+]);
+const AUTH_PATHS = new Set([
+  "me",
+  "change-password",
+  "recovery-codes",
+  "sessions",
+  "sessions/end-others",
 ]);
 
 /**
@@ -96,7 +106,9 @@ export function resolvePlatformTarget(segments: string[]): string | null {
   const n = segments.length;
   switch (head) {
     case "auth":
-      return n === 2 && (a === "me" || a === "change-password") ? path : null;
+      return n <= 3 && AUTH_PATHS.has(segments.slice(1).join("/"))
+        ? path
+        : null;
     case "audit":
       return n === 1 ? path : null;
     case "organizations":

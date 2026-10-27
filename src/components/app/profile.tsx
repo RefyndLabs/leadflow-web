@@ -29,7 +29,7 @@ function readTheme(): Theme {
   }
 }
 
-function Appearance() {
+export function Appearance() {
   const [theme, setTheme] = React.useState<Theme>(() =>
     typeof window === "undefined" ? "system" : readTheme(),
   );

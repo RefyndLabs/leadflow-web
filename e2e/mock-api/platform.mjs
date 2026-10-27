@@ -1,6 +1,8 @@
 // The platform console's part of the mock API (/platform/*): its own accounts and tokens,
-// a two-step sign-in where the code "123456" is always right, and the organization actions.
-// Tenant tokens are never accepted here, and platform tokens never on tenant endpoints.
+// a two-step sign-in where the code "123456" is always right (also as the fresh code that
+// changing a password, deleting an organization or making an owner needs), and the
+// organization actions. Tenant tokens are never accepted here, and platform tokens never
+// on tenant endpoints. The signed-in admin is an owner.
 import { randomUUID } from "node:crypto";
 
 export const PLATFORM_EMAIL = "ops@example.com";
@@ -15,6 +17,7 @@ const me = {
   id: uid(),
   name: "Ops Person",
   email: PLATFORM_EMAIL,
+  role: "owner",
   mfa_enabled: false,
   must_change_password: false,
   recovery_codes_left: 0,
@@ -44,6 +47,9 @@ const org = (name, slug, extra = {}) => ({
   handoff_email: null,
   default_phone_region: "IN",
   website: null,
+  deletion_due_at: null,
+  deletion_scheduled_at: null,
+  deletion_scheduled_by: null,
   ...extra,
 });
 const orgs = [
@@ -103,6 +109,27 @@ const log = (action, target_org_slug = null, details = null) =>
 const bearer = (req) =>
   (req.headers.authorization ?? "").replace(/^Bearer /, "");
 
+/** The fresh authenticator code: null when right, else the API's answer. */
+const freshCode = (b) =>
+  !(b.code ?? b.recovery_code)
+    ? [422, { detail: "Enter the code from your authenticator app" }]
+    : (b.code ?? b.recovery_code) !== PLATFORM_CODE
+      ? [
+          403,
+          {
+            detail:
+              "That code is wrong or was already used. Wait for the next one and try again",
+          },
+        ]
+      : null;
+const DAY = 24 * 60 * 60 * 1000;
+const clearDeletion = (o) =>
+  Object.assign(o, {
+    deletion_due_at: null,
+    deletion_scheduled_at: null,
+    deletion_scheduled_by: null,
+  });
+
 /** Returns true when the request was a /platform/* one (answered here). */
 export async function handlePlatform(
   req,
@@ -112,8 +139,19 @@ export async function handlePlatform(
   url,
   { json, readBody },
 ) {
-  if (!path.startsWith("/platform/")) return false;
   let m;
+  // Test hook (mock only): a scheduled deletion's 7 days are over.
+  if (
+    (m = /^\/__platform\/due\/([a-z0-9-]+)$/.exec(path)) &&
+    method === "POST"
+  ) {
+    const o = orgs.find((x) => x.slug === m[1]);
+    if (!o?.deletion_due_at)
+      return (json(res, 404, { detail: "Nothing scheduled" }), true);
+    o.deletion_due_at = new Date(Date.now() - 60_000).toISOString();
+    return (json(res, 200, o), true);
+  }
+  if (!path.startsWith("/platform/")) return false;
 
   if (path === "/platform/auth/login" && method === "POST") {
     const b = (await readBody(req)) ?? {};
@@ -176,7 +214,53 @@ export async function handlePlatform(
     return (json(res, 204), true);
   }
   if (path === "/platform/auth/change-password") {
+    const b = (await readBody(req)) ?? {};
+    if (b.current_password !== PLATFORM_PASSWORD)
+      return (json(res, 403, { detail: "Current password is wrong" }), true);
+    const bad = freshCode(b);
+    if (bad) return (json(res, ...bad), true);
     me.must_change_password = false;
+    log("platform.password_changed");
+    return (json(res, 204), true);
+  }
+  if (path === "/platform/auth/recovery-codes" && method === "POST") {
+    const bad = freshCode((await readBody(req)) ?? {});
+    if (bad) return (json(res, ...bad), true);
+    me.recovery_codes_left = 10;
+    log("platform.recovery_codes_replaced");
+    return (
+      json(res, 200, {
+        recovery_codes: Array.from(
+          { length: 10 },
+          (_, i) => `newer-code${String(i).padStart(2, "0")}`,
+        ),
+      }),
+      true
+    );
+  }
+  if (path === "/platform/auth/sessions" && method === "GET") {
+    const current = bearer(req);
+    return (
+      json(
+        res,
+        200,
+        [...tokens].map((t) => ({
+          id: t.slice(4),
+          created_at: now(),
+          last_used_at: now(),
+          expires_at: new Date(Date.now() + 12 * 3600_000).toISOString(),
+          ip_address: "127.0.0.1",
+          user_agent:
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/130.0 Safari/537.36",
+          current: t === current,
+        })),
+      ),
+      true
+    );
+  }
+  if (path === "/platform/auth/sessions/end-others" && method === "POST") {
+    for (const t of [...tokens]) if (t !== bearer(req)) tokens.delete(t);
+    log("platform.other_sessions_ended");
     return (json(res, 204), true);
   }
   if (path === "/platform/audit") {
@@ -255,8 +339,66 @@ export async function handlePlatform(
     }
     if (action === "activate") {
       o.is_active = true;
+      clearDeletion(o);
       log("platform.org_activated", o.slug);
       return (json(res, 200, o), true);
+    }
+    if (action === "deletion" && method === "POST") {
+      const b = (await readBody(req)) ?? {};
+      if (b.confirm_slug !== o.slug)
+        return (
+          json(res, 422, {
+            detail: "Type the organization's short name to confirm",
+          }),
+          true
+        );
+      if (o.is_active)
+        return (
+          json(res, 409, { detail: "Suspend the organization first" }),
+          true
+        );
+      const bad = freshCode(b);
+      if (bad) return (json(res, ...bad), true);
+      Object.assign(o, {
+        deletion_scheduled_at: now(),
+        deletion_due_at: new Date(Date.now() + 7 * DAY).toISOString(),
+        deletion_scheduled_by: PLATFORM_EMAIL,
+      });
+      log("platform.org_deletion_scheduled", o.slug);
+      return (json(res, 200, o), true);
+    }
+    if (action === "deletion" && method === "DELETE") {
+      if (!o.deletion_due_at)
+        return (json(res, 409, { detail: "No deletion is scheduled" }), true);
+      clearDeletion(o);
+      log("platform.org_deletion_cancelled", o.slug);
+      return (json(res, 200, o), true);
+    }
+    if (action === "delete" && method === "POST") {
+      const b = (await readBody(req)) ?? {};
+      if (b.confirm_slug !== o.slug)
+        return (
+          json(res, 422, {
+            detail: "Type the organization's short name to confirm",
+          }),
+          true
+        );
+      if (!o.deletion_due_at || new Date(o.deletion_due_at) > new Date())
+        return (
+          json(res, 409, {
+            detail: "Suspend the organization and schedule its deletion first",
+          }),
+          true
+        );
+      const bad = freshCode(b);
+      if (bad) return (json(res, ...bad), true);
+      orgs.splice(orgs.indexOf(o), 1);
+      users.delete(o.slug);
+      log("platform.org_deleted", o.slug, { name: o.name });
+      return (
+        json(res, 200, { slug: o.slug, rows_deleted: { users: 1 } }),
+        true
+      );
     }
     if (action === "integration") {
       const b = (await readBody(req)) ?? {};
@@ -330,10 +472,23 @@ export async function handlePlatform(
     return (json(res, 200, admins), true);
   if (path === "/platform/admins" && method === "POST") {
     const b = (await readBody(req)) ?? {};
+    if (!b.email.toLowerCase().endsWith("@example.com"))
+      return (
+        json(res, 422, {
+          detail:
+            "Platform admins must use an email address ending in @example.com",
+        }),
+        true
+      );
+    if (b.role === "owner") {
+      const bad = freshCode(b);
+      if (bad) return (json(res, ...bad), true);
+    }
     const a = {
       id: uid(),
       name: b.name,
       email: b.email.toLowerCase(),
+      role: b.role ?? "staff",
       is_active: true,
       mfa_enabled: false,
       must_change_password: true,
@@ -341,8 +496,28 @@ export async function handlePlatform(
       created_at: now(),
     };
     admins.push(a);
-    log("platform.admin_created", null, { email: a.email });
+    log("platform.admin_created", null, { email: a.email, role: a.role });
     return (json(res, 201, { admin: a, temporary_password: temp() }), true);
+  }
+  if (
+    (m = /^\/platform\/admins\/([^/]+)\/role$/.exec(path)) &&
+    method === "PUT"
+  ) {
+    const a = admins.find((x) => x.id === m[1]);
+    if (!a)
+      return (json(res, 404, { detail: "Platform admin not found" }), true);
+    const b = (await readBody(req)) ?? {};
+    if (b.role === "owner" && a.role !== "owner") {
+      const bad = freshCode(b);
+      if (bad) return (json(res, ...bad), true);
+    }
+    log("platform.admin_role_changed", null, {
+      email: a.email,
+      from: a.role,
+      to: b.role,
+    });
+    a.role = b.role;
+    return (json(res, 200, a), true);
   }
   if ((m = /^\/platform\/admins\/([^/]+)\/([a-z-]+)$/.exec(path))) {
     const a = admins.find((x) => x.id === m[1]);
@@ -353,6 +528,10 @@ export async function handlePlatform(
         json(res, 400, { detail: "You can't do this to your own account" }),
         true
       );
+    if (m[2] === "reset-password" || m[2] === "reset-mfa") {
+      const bad = freshCode((await readBody(req)) ?? {});
+      if (bad) return (json(res, ...bad), true);
+    }
     if (m[2] === "reset-password")
       return (
         json(res, 200, { email: a.email, temporary_password: temp() }),

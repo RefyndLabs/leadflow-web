@@ -35,7 +35,7 @@ Channels → n8n (orchestration) → Core API (FastAPI) → PostgreSQL
 
 **Frontend (Next.js)** — mobile-optimized, used by the sales team. Built separately (`exporter-leadflow-web`), it talks to this API only, server-side.
 
-**Auth:** scoped, organization-bound API key for n8n → API calls. Short-lived JWT + refresh token (server-side revocable sessions) for frontend → API calls, with role-based permissions (exec / manager / admin). See "Multi-tenancy and security decisions" below.
+**Auth:** one integration key (`lfi_…`) for n8n → API calls, naming the organization in `X-Leadflow-Org` on every request; scoped, organization-bound API keys (`lfk_…`) for other machine callers. Short-lived JWT + refresh token (server-side revocable sessions) for frontend → API calls, with role-based permissions (exec / manager / admin). See "Multi-tenancy and security decisions" below.
 
 **Hosting:** single VPS, Docker Compose (Caddy for TLS, Postgres, Redis, the API, a backup sidecar), ~$20–40/month; the API is stateless so it can scale out later. Runbook: docs/OPERATIONS.md. **Today** a free-tier demo runs on Render (API) + Neon (Postgres) + Upstash (Redis) + Vercel (web app): docs/OPERATIONS.md §12.
 
@@ -48,11 +48,11 @@ This is built to be sold to several companies, so it is **multi-tenant from the 
 - **Identity:** JWT (15 min) carries `org` and a session id; sessions and single-use rotating refresh tokens live in the database so revocation is immediate; lockout, argon2id, password policy. **API keys** are bound to one org, carry an explicit scope list (least privilege), can expire and be revoked, and can never be granted approve/delete/admin/config-write permissions.
 - **Permissions**, not roles, are checked by endpoints (`leads:ingest`, `touchpoints:write`, `cadences:read`, `leads:sweep`, `quotations:approve`, `keys:manage`, `audit:read`, …). Roles are just bundles.
 - **Audit:** append-only `audit_logs`, written automatically in the same transaction as each change; secrets redacted; immutable even to the DB owner.
-- **No super-admin over HTTP.** Creating/suspending/exporting/offboarding organizations is an operator CLI (`python -m app.cli`) using the owner DB credentials.
+- **Platform console, no tenant super-admin.** Platform admins (separate accounts at the company's email domain, mandatory two-step login) can create organizations and manage their platform settings at `/platform`, but never read customer data. Two roles (decided 27 Oct 2026, `0016`): **owners** can also suspend and delete organizations (delete = suspend, schedule, 7-day wait enforced by the database, confirm with a fresh authenticator code), reset company users' passwords, revoke integration keys and manage platform admins; **staff** do the rest. Exporting an organization is CLI only (`python -m app.cli`, owner DB credentials). The company's own organization is a tenant like any other, and the same email may be a platform admin and a user of an organization (two separate accounts and logins).
 - **Per-org settings:** `new_lead_gap_hours`, `fuzzy_match_threshold`, `assignment_strategy` (round_robin | division), editable by the org admin.
 - **Reliability:** Idempotency-Key on ingest/bulk-ingest/touchpoints (n8n retries are safe); Redis-backed rate limits; request IDs; JSON logs; Sentry hooks; `/health` and `/ready`; daily encrypted backups with a weekly automatic restore test; staging = same compose with a different env file.
-- **n8n in a multi-tenant world is deliberately undecided** ("we'll see later"). The API side is ready either way: one org-bound key per tenant.
-- **Not built (yet):** billing/plans, MFA/SSO, email-driven flows (invites, password reset), per-org quotas, multi-org users. See PROJECT_STATUS.md §10.
+- **n8n in a multi-tenant world (decided 22 Oct 2026, migration `0010`):** one integration key serves every organization that is switched on for automation; each call names its organization in `X-Leadflow-Org`. The key's permissions are capped, it is audited as `integration` and rate-limited per organization. n8n keeps no data of its own (no n8n data tables since 26 Oct).
+- **Not built (yet):** billing/plans, MFA for company users (platform admins have it), SSO, email-driven flows (invites, password reset), per-org quotas, multi-org users. See PROJECT_STATUS.md §10.
 
 ## Data model
 
@@ -152,7 +152,7 @@ Configuration for follow-up timing, not hardcoded logic.
 | message_template_id | text | yes | WhatsApp / primary template |
 | email_message_template_id | text | no | template for contacts reachable by email |
 
-`GET /cadences/due` also returns each lead's **contact** (phone/email) and **when the contact last wrote on WhatsApp and on email**, so the orchestrator can pick a channel that can actually reach them (e.g. WhatsApp's 24-hour window). The API never picks the channel or sends anything.
+`GET /cadences/due` also returns each lead's **contact** (phone/email) and **when the contact last wrote on WhatsApp and on email**, so the orchestrator can pick a channel that can actually reach them (e.g. WhatsApp's 24-hour window). It also embeds the lead's message templates (`/message-templates`, since `0012`) and leaves out paused and handed-off leads. The API never picks the channel; n8n decides and, for WhatsApp, asks the API to send (`POST /whatsapp/messages`).
 
 ### Event
 | Field | Type | Required | Notes |
@@ -243,11 +243,18 @@ POST /leads/{id}/assign       — set/reassign owner
 GET  /cadences/due            — leads needing a follow-up action right now
 POST /leads/{id}/first-touch  — ask for a personalised first message (a person approves it before it goes out)
 GET  /outreach?status=requested|approved, POST /outreach/{id}/claim|draft|sent|fail — the writing and sending workflows
+POST /whatsapp/messages       — send one WhatsApp message with the organization's stored token (Idempotency-Key required)
+GET  /whatsapp/messages?wamid= — which lead a delivery-status update belongs to
+GET  /integrations/orgs, /integrations/orgs/{slug}, /integrations/whatsapp/{phone_number_id} — integration key only
+/message-templates            — follow-up message templates (CRUD)
+POST/DELETE /leads/{id}/handoff — the WhatsApp bot hands a lead to a person / resumes
+/ignored-senders              — senders judged "not a buyer" (record, list, lookup, un-ignore)
+/platform/*                   — platform console (platform admins only)
 ```
 
 Plus standard CRUD for Account, Contact, Collateral, Catalogue, FAQ, Event, User/Team, and auth endpoints (login/session for frontend, key validation for n8n).
 
-**What does NOT belong in this API:** message content/templates, cadence timing values, AI extraction prompts. (The one exception is the first message to a new lead: the API *stores* the AI-written draft so a person can review and approve it, but the text is written by n8n's AI and the API sends nothing.) Those live in n8n, built separately, so non-engineers can adjust them without a deploy. This API only decides *when* something should happen and *whether* a lead is a duplicate — never *what* gets sent to anyone.
+**What does NOT belong in this API:** AI prompts and AI calls, and the decision of what to send on which channel. Those live in n8n, built separately. The API decides *when* something should happen and *whether* a lead is a duplicate. It does store what people edit in the web app: follow-up message templates (`0012`) and the AI-written first message a person approves (`0009`). And it sends WhatsApp messages when n8n asks (`0011`), so the Meta token never leaves the API (encrypted at rest). Email still goes out through n8n's Gmail.
 
 ## Build order
 
@@ -264,6 +271,6 @@ Plus standard CRUD for Account, Contact, Collateral, Catalogue, FAQ, Event, User
 ## Explicitly out of scope for this Claude Code project
 
 - n8n workflows (built separately)
-- Frontend/UI (Next.js, built later, separate phase)
-- WhatsApp Cloud API integration itself (n8n's responsibility — the API only needs to expose endpoints n8n can call, it does not send messages itself)
+- Frontend/UI (Next.js, built separately in `exporter-leadflow-web`)
+- Receiving WhatsApp messages (Meta's webhook goes to n8n). Sending is the one exception: since `0011` the API sends when n8n asks, so the token stays in the API.
 - AI extraction (OCR, speech-to-text) — happens in n8n before data reaches this API; this API only receives already-normalized payloads

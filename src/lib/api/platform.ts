@@ -27,6 +27,9 @@ export type PlatformIntegrationKey = S["PlatformIntegrationKey"];
 export type PlatformAdmin = S["PlatformAdminRead"];
 export type PlatformAdminCreated = S["PlatformAdminCreated"];
 export type PlatformAuditEntry = S["PlatformAuditEntry"];
+export type PlatformSession = S["PlatformSessionRead"];
+export type PlatformRecoveryCodes = S["PlatformRecoveryCodes"];
+export type PlatformOrgDeleted = S["PlatformOrgDeleted"];
 
 const BASE = "/api/platform/lf";
 let redirecting = false;
@@ -133,6 +136,7 @@ export const platformKeys = {
   keys: ["platform", "integration-keys"] as const,
   admins: ["platform", "admins"] as const,
   audit: (org?: string) => ["platform", "audit", org ?? ""] as const,
+  sessions: ["platform", "sessions"] as const,
 };
 
 export function usePlatformMe() {
@@ -183,6 +187,14 @@ export function usePlatformAdmins() {
     queryKey: platformKeys.admins,
     queryFn: ({ signal }) =>
       platformApi<PlatformAdmin[]>("/admins", { signal }),
+  });
+}
+
+export function usePlatformSessions() {
+  return useQuery({
+    queryKey: platformKeys.sessions,
+    queryFn: ({ signal }) =>
+      platformApi<PlatformSession[]>("/auth/sessions", { signal }),
   });
 }
 

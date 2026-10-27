@@ -26,6 +26,14 @@ describe("platform gateway allow-list", () => {
       ["organizations", "acme", "whatsapp"],
       "/platform/organizations/acme/whatsapp",
     ],
+    [
+      ["organizations", "acme", "deletion"],
+      "/platform/organizations/acme/deletion",
+    ],
+    [
+      ["organizations", "acme", "delete"],
+      "/platform/organizations/acme/delete",
+    ],
     [["organizations", "acme", "users"], "/platform/organizations/acme/users"],
     [
       ["organizations", "acme", "users", ID, "reset-password"],
@@ -38,9 +46,13 @@ describe("platform gateway allow-list", () => {
     ],
     [["admins"], "/platform/admins"],
     [["admins", ID, "reset-mfa"], `/platform/admins/${ID}/reset-mfa`],
+    [["admins", ID, "role"], `/platform/admins/${ID}/role`],
     [["audit"], "/platform/audit"],
     [["auth", "me"], "/platform/auth/me"],
     [["auth", "change-password"], "/platform/auth/change-password"],
+    [["auth", "recovery-codes"], "/platform/auth/recovery-codes"],
+    [["auth", "sessions"], "/platform/auth/sessions"],
+    [["auth", "sessions", "end-others"], "/platform/auth/sessions/end-others"],
   ])("allows %j", (segments, expected) => {
     expect(resolvePlatformTarget(segments)).toBe(expected);
   });
@@ -49,6 +61,8 @@ describe("platform gateway allow-list", () => {
     [[]],
     [["auth", "login"]], // sign-in has its own route; the challenge never passes the gateway
     [["auth", "verify"]],
+    [["auth", "sessions", ID]],
+    [["auth", "me", "sessions"]],
     [["leads"]], // tenant resources are not reachable through the console
     [["organizations", "acme", "export"]],
     [["organizations", "acme", "users", "not-a-uuid", "unlock"]],

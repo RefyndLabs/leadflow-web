@@ -1,13 +1,17 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { ApiError, describeError } from "@/lib/api/errors";
 import {
   platformApi,
   usePlatformAction,
   usePlatformAudit,
+  usePlatformMe,
   usePlatformOrg,
   usePlatformOrgUsers,
+  type PlatformOrgDeleted,
   type PlatformOrgDetail,
   type PlatformTemporaryPassword,
 } from "@/lib/api/platform";
@@ -28,6 +32,7 @@ import {
 import { Field } from "@/components/ui/field";
 import { Input, PasswordInput } from "@/components/ui/input";
 import { describeAction } from "./activity";
+import { FreshCodeField, useFreshCode } from "./fresh-code";
 import { ShownOnce } from "./shown-once";
 
 function errorText(err: unknown) {
@@ -36,7 +41,12 @@ function errorText(err: unknown) {
     : describeError(err);
 }
 
+function useIsOwner() {
+  return usePlatformMe().data?.role === "owner";
+}
+
 function StatusCard({ org }: { org: PlatformOrgDetail }) {
+  const isOwner = useIsOwner();
   const [open, setOpen] = React.useState(false);
   const [typed, setTyped] = React.useState("");
   const suspend = usePlatformAction(
@@ -76,7 +86,11 @@ function StatusCard({ org }: { org: PlatformOrgDetail }) {
             {org.leads_total} leads · created {formatRelative(org.created_at)}
           </span>
         </p>
-        {org.is_active ? (
+        {!isOwner ? (
+          <p className="text-muted">
+            Only an owner can suspend, reactivate or delete an organization.
+          </p>
+        ) : org.is_active ? (
           <>
             <p className="text-muted">
               Suspending signs everyone out at once and blocks their logins and
@@ -91,7 +105,9 @@ function StatusCard({ org }: { org: PlatformOrgDetail }) {
             loading={activate.isPending}
             onClick={() => activate.mutate(undefined)}
           >
-            Reactivate organization
+            {org.deletion_due_at
+              ? "Reactivate (cancels the deletion)"
+              : "Reactivate organization"}
           </Button>
         )}
       </CardBody>
@@ -118,6 +134,174 @@ function StatusCard({ org }: { org: PlatformOrgDetail }) {
               </Button>
             </DialogFooter>
           </div>
+        </DialogContent>
+      </Dialog>
+    </Card>
+  );
+}
+
+/**
+ * Deleting, for owners: suspend first, then schedule (slug + fresh code), then
+ * after the 7-day wait confirm (slug + fresh code again). Any owner can cancel
+ * until then; the database refuses an early deletion whatever the page does.
+ */
+function DeletionCard({ org }: { org: PlatformOrgDetail }) {
+  const router = useRouter();
+  const confirm = useConfirm();
+  const code = useFreshCode();
+  const [open, setOpen] = React.useState<"schedule" | "delete" | null>(null);
+  const [typed, setTyped] = React.useState("");
+  const [error, setError] = React.useState<string | null>(null);
+  const close = () => {
+    setOpen(null);
+    setTyped("");
+    setError(null);
+    code.reset();
+  };
+  const schedule = usePlatformAction(
+    () =>
+      platformApi(`/organizations/${org.slug}/deletion`, {
+        method: "POST",
+        body: { confirm_slug: typed, ...code.body() },
+      }),
+    { handled: true, success: "Deletion scheduled", onSuccess: close },
+  );
+  const cancel = usePlatformAction(
+    () =>
+      platformApi(`/organizations/${org.slug}/deletion`, { method: "DELETE" }),
+    { success: "Deletion cancelled" },
+  );
+  const remove = usePlatformAction(
+    () =>
+      platformApi<PlatformOrgDeleted>(`/organizations/${org.slug}/delete`, {
+        method: "POST",
+        body: { confirm_slug: typed, ...code.body() },
+      }),
+    {
+      handled: true,
+      onSuccess: () => {
+        close();
+        toast.success(`${org.name} is deleted`);
+        router.replace("/platform");
+      },
+    },
+  );
+
+  const due = org.deletion_due_at ? new Date(org.deletion_due_at) : null;
+  // When the page was opened; the API decides for real anyway.
+  const [openedAt] = React.useState(() => Date.now());
+  const isDue = due !== null && due.getTime() <= openedAt;
+  const action = open === "delete" ? remove : schedule;
+
+  return (
+    <Card className="border-danger/40 lg:col-span-2">
+      <CardHeader>
+        <CardTitle>Delete organization</CardTitle>
+      </CardHeader>
+      <CardBody className="space-y-3 text-[14px]">
+        {org.is_active ? (
+          <p className="text-muted">
+            To delete it, suspend it first. Then schedule the deletion: it can
+            be carried out 7 days later, and any owner can cancel until then.
+          </p>
+        ) : !due ? (
+          <>
+            <p className="text-muted">
+              Deleting removes the organization and all its data for good: its
+              users, leads, messages, files and its own audit log. It can be
+              carried out 7 days after you schedule it. Older backups keep the
+              data until they expire.
+            </p>
+            <Button variant="danger-tint" onClick={() => setOpen("schedule")}>
+              Schedule deletion
+            </Button>
+          </>
+        ) : (
+          <>
+            <InlineAlert tone="warning">
+              Scheduled by {org.deletion_scheduled_by ?? "an owner"}
+              {org.deletion_scheduled_at
+                ? ` ${formatRelative(org.deletion_scheduled_at)}`
+                : ""}
+              .{" "}
+              {isDue
+                ? "The waiting period is over: an owner can delete it now."
+                : `It can be deleted from ${formatDateTime(org.deletion_due_at!)}.`}
+            </InlineAlert>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="secondary"
+                loading={cancel.isPending}
+                onClick={async () => {
+                  if (
+                    await confirm({
+                      title: "Cancel the deletion?",
+                      description:
+                        "The organization stays suspended. Scheduling again starts a new 7-day wait.",
+                      confirmLabel: "Cancel deletion",
+                    })
+                  )
+                    cancel.mutate(undefined);
+                }}
+              >
+                Cancel deletion
+              </Button>
+              <Button
+                variant="danger"
+                disabled={!isDue}
+                onClick={() => setOpen("delete")}
+              >
+                Delete permanently
+              </Button>
+            </div>
+          </>
+        )}
+      </CardBody>
+      <Dialog open={open !== null} onOpenChange={(o) => !o && close()}>
+        <DialogContent
+          title={
+            open === "delete"
+              ? `Delete ${org.name} permanently?`
+              : `Schedule ${org.name} for deletion?`
+          }
+          description={
+            open === "delete"
+              ? "Everything it owns is deleted now. This can't be undone."
+              : "It stays suspended, and can be deleted 7 days from now. Any owner can cancel until then."
+          }
+        >
+          <form
+            noValidate
+            className="space-y-4 px-5 pb-5 pt-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              setError(null);
+              action.mutate(undefined, {
+                onError: (err) => setError(errorText(err)),
+              });
+            }}
+          >
+            {error && <InlineAlert>{error}</InlineAlert>}
+            <Field label={`Type ${org.slug} to confirm`} required>
+              <Input value={typed} onChange={(e) => setTyped(e.target.value)} />
+            </Field>
+            <FreshCodeField state={code} />
+            <DialogFooter>
+              <Button type="button" variant="secondary" onClick={close}>
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="danger"
+                disabled={
+                  typed.trim().toLowerCase() !== org.slug || !code.ready
+                }
+                loading={action.isPending}
+              >
+                {open === "delete" ? "Delete permanently" : "Schedule deletion"}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </Card>
@@ -364,6 +548,7 @@ function WhatsAppCard({ org }: { org: PlatformOrgDetail }) {
 
 function UsersCard({ org }: { org: PlatformOrgDetail }) {
   const confirm = useConfirm();
+  const isOwner = useIsOwner();
   const q = usePlatformOrgUsers(org.slug);
   const [shown, setShown] = React.useState<PlatformTemporaryPassword | null>(
     null,
@@ -424,24 +609,26 @@ function UsersCard({ org }: { org: PlatformOrgDetail }) {
                   Unlock
                 </Button>
               )}
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={async () => {
-                  if (
-                    await confirm({
-                      title: `Reset ${u.name}'s password?`,
-                      description:
-                        "They are signed out everywhere and get a temporary password, which you hand to them. They choose a new one at their next sign-in.",
-                      confirmLabel: "Reset password",
-                      destructive: true,
-                    })
-                  )
-                    reset.mutate(u.id);
-                }}
-              >
-                Reset password
-              </Button>
+              {isOwner && (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={async () => {
+                    if (
+                      await confirm({
+                        title: `Reset ${u.name}'s password?`,
+                        description:
+                          "They are signed out everywhere and get a temporary password, which you hand to them. They choose a new one at their next sign-in.",
+                        confirmLabel: "Reset password",
+                        destructive: true,
+                      })
+                    )
+                      reset.mutate(u.id);
+                  }}
+                >
+                  Reset password
+                </Button>
+              )}
             </li>
           ))}
         </ul>
@@ -490,6 +677,7 @@ function RecentActivity({ slug }: { slug: string }) {
 
 export function PlatformOrganization({ slug }: { slug: string }) {
   const q = usePlatformOrg(slug);
+  const me = usePlatformMe();
   if (q.isPending)
     return (
       <div className="space-y-4">
@@ -500,6 +688,7 @@ export function PlatformOrganization({ slug }: { slug: string }) {
   if (q.isError)
     return <ErrorState error={q.error} onRetry={() => void q.refetch()} />;
   const org = q.data;
+  const isOwner = me.data?.role === "owner";
   return (
     <>
       <PageHeader
@@ -514,6 +703,7 @@ export function PlatformOrganization({ slug }: { slug: string }) {
         <WhatsAppCard key={`w-${org.id}`} org={org} />
         <UsersCard org={org} />
         <RecentActivity slug={org.slug} />
+        {isOwner && <DeletionCard org={org} />}
       </div>
     </>
   );

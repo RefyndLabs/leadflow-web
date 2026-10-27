@@ -1,6 +1,6 @@
 # Leadflow web
 
-The sales team's UI for the Leadflow API: leads and conversations, follow-ups, catalog, exhibitions, and the admin area. Next.js (App Router) + TypeScript, Tailwind, TanStack Query, React Hook Form + Zod. The visual design is a deliberately quiet placeholder; the functionality is meant to be complete.
+The sales team's UI for the Leadflow API: leads and conversations, follow-ups, catalog, exhibitions, and the admin area, plus the separate platform console at `/platform`. Next.js (App Router) + TypeScript, Tailwind, TanStack Query, React Hook Form + Zod. The visual design is a deliberately quiet placeholder; the functionality is meant to be complete.
 
 Read alongside `PROJECT_CONTEXT.md` (product), `PROJECT_STATUS.md` (API) and, in the API repo, `STATUS_UI.md` (the app's status and the API contract it uses). Deployed on Vercel from `main`: `https://leadflow-web-mauve.vercel.app`, against the API on Render.
 
@@ -22,8 +22,8 @@ pnpm mock-api                     # http://127.0.0.1:4010 — API_URL=http://127
 | Script | What it does |
 |---|---|
 | `pnpm check` | typecheck + lint + unit tests |
-| `pnpm test` | Vitest (181 tests: schema drift vs `openapi.json`, gateway allow-list, CSRF, session, refresh single-flight, lead-list URL → query, parsing, contact cards) |
-| `pnpm build && pnpm test:e2e` | Playwright against the production build and the mock API (51 tests: desktop + phone, light + dark, axe accessibility on every route) |
+| `pnpm test` | Vitest (224 tests on 27 Oct 2026: schema drift vs `openapi.json`, gateway allow-list, CSRF, session, refresh single-flight, lead-list URL → query, parsing, contact cards) |
+| `pnpm build && pnpm test:e2e` | Playwright against the production build and the mock API (62 test cases, run on desktop + phone, light + dark, axe accessibility on every route) |
 | `pnpm gen:api` | regenerate `src/lib/api/schema.d.ts` from `openapi.json` |
 
 Environment (`.env.example` lists all of it): `API_URL` and `SESSION_SECRET` are required; `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN` enable error tracking. **`API_URL` is server-only** — the browser never learns the API's address.
@@ -36,6 +36,7 @@ Browser ── same-origin, httpOnly cookie ──▶ Next.js server ── Auth
                                             /api/lf/*    allow-listed gateway to the API
                                             /api/captures/*  streams card photo (front, back) / voice uploads to the API
                                             /api/attachments/* streams stored photos and recordings back (Range supported)
+                                            /api/platform/*   platform console: login, two-step verify, logout, its own gateway
 ```
 
 - **The browser only talks to this app.** TanStack Query fetchers call `/api/lf/*`; that route reads the session cookie, attaches the bearer token and forwards. Tokens never reach client JS.
@@ -47,6 +48,9 @@ Browser ── same-origin, httpOnly cookie ──▶ Next.js server ── Auth
 - **Files**: photos and voice notes are uploaded to the API itself (no S3, no links). `/api/captures/[id]/card|voice` streams the multipart body through without buffering or re-encoding (the access token is refreshed *before* forwarding because a streamed body can't be replayed), and `/api/attachments/[id]` streams files back with `Range` passthrough, which Safari needs to play audio. Only image/audio is ever served inline.
 - **Permissions** come from `/auth/me`'s `permissions` array, never the role name. Nav, buttons and whole screens are gated by it, and 403s are handled everywhere.
 - **Idempotency-Key**: one per logical submission (enquiry, touchpoint, each import chunk), reused on retry, fresh once the form changes.
+- **New API resource = add it to the gateway allow-list** (`src/lib/server/paths.ts`), or production answers 404 for it. (That is what broke the Messages tab on 23 Oct.) Rebuild before running e2e.
+- **Temporary password:** when `/auth/me` says `must_change_password`, the app shows only a "Choose your own password" screen. The API enforces the same (403 on everything else) since 26 Oct.
+- **Platform console** (`/platform`): its own sign-in (password, then the authenticator code), its own encrypted cookie (key derived separately from `SESSION_SECRET`) and its own gateway (`/api/platform/lf/*` → the API's `/platform/*`). Company sessions and platform sessions never mix.
 
 ## Design
 
@@ -75,7 +79,14 @@ Grounded in the `apple-design` skill (web app, so principles and foundations app
    - **First message** card on the lead page (`first-touch.tsx`): when a show capture is confirmed as a new lead (checkbox on the review screen, on by default), n8n's AI writes a personal WhatsApp message and email. The rep sees what it is personalised on and what to check, edits it, and either approves it (n8n sends it) or sends it from their own WhatsApp / email app (`wa.me` / `mailto:` with the text filled in, then a confirm that logs it as sent). *Write it again* takes guidance; *Discard*; failed and stuck sends have Retry. The page polls while it is written or sent. Settings → Organization → *First messages* switches on sending without review. The gateway lets through only the person-facing `/outreach/{id}` actions.
    - **Save contact** (`save-contact.tsx`, `src/lib/vcard.ts`) on the lead and contact pages. iPhone and computers get a vCard 3.0 file. On Android it tries an `intent:` link to Contacts' "new contact" screen. **That doesn't work:** Chrome only opens apps that accept browser links, and that screen doesn't, so the rep falls back to the offered `.vcf` download. To be fixed (see `STATUS_UI.md` §5).
    - Mock API: `POST /__outreach/{leadId}` puts a lead's first message into a state (plays the n8n writer in e2e).
-2. **Message templates have no API**; they live in n8n. Follow-up rules store only the template ID, and the screen says so. (The first message to a new lead is written per lead by AI, not from a template.)
+1c. **Automation settings and WhatsApp bot (API migrations 0010-0015, 23-24 Oct).**
+   - **Settings → Organization → notification emails:** where the automation sends problem alerts, show-capture reviews and bot hand-offs.
+   - **Follow-ups → Messages tab:** the text of automated follow-ups (`/message-templates`); the rule form suggests the message keys.
+   - **Lead page hand-off banner:** "Handed to your team" when the WhatsApp bot hands a lead over, with **Let the bot reply** (`DELETE /leads/{id}/handoff`).
+   - **Ignored senders page** (`/ignored-senders`): numbers the bot judged "not a buyer", with un-ignore.
+   - **API keys:** the `whatsapp:send` scope is offered.
+   - **Platform console** at `/platform`: organizations (create, suspend, delete after a 7-day wait, automation on/off, notification emails, WhatsApp number and token), their users (unlock, reset password), automation keys, platform admins (owners and staff; owner-only actions are hidden from staff, and the API refuses them anyway), activity log, Settings (theme, password, recovery codes, sessions). Changing a password, deleting, making an owner and resetting another admin's password or two-step sign-in ask for a fresh authenticator code (`components/platform/fresh-code.tsx`). Mock-only hook: `POST /__platform/due/{slug}` makes a scheduled deletion due.
+2. **Message templates** are edited in the app (Follow-ups → Messages). Follow-up rules refer to them by key. (The first message to a new lead is written per lead by AI, not from a template.)
 3. **Contact and company lists have no search.** The API only paginates them, so contact/company search scans the newest 200 and says so; "needs review" companies are found the same way. Leads (`/leads/overview?q=`) and products (`/products?q=`) do have server search now.
 4. **No account merge endpoint**, so a flagged duplicate company shows a side-by-side comparison and explains the manual route.
 5. `/leads/stats` is untyped in OpenAPI; the shape from the build guide is used (`src/lib/api/types.ts`).

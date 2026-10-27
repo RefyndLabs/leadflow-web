@@ -5,6 +5,7 @@ import {
   platformApi,
   usePlatformAction,
   usePlatformKeys,
+  usePlatformMe,
 } from "@/lib/api/platform";
 import { formatRelative } from "@/lib/format";
 import { PageHeader } from "@/components/app/page-header";
@@ -22,6 +23,7 @@ import {
 export function PlatformKeys() {
   const confirm = useConfirm();
   const q = usePlatformKeys();
+  const isOwner = usePlatformMe().data?.role === "owner";
   const revoke = usePlatformAction(
     (id: string) =>
       platformApi(`/integration-keys/${id}/revoke`, { method: "POST" }),
@@ -76,7 +78,7 @@ export function PlatformKeys() {
                       : " · from any address"}
                   </p>
                 </div>
-                {!k.revoked_at && (
+                {!k.revoked_at && isOwner && (
                   <Button
                     size="sm"
                     variant="danger-tint"

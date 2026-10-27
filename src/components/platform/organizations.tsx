@@ -205,6 +205,9 @@ export function PlatformOrganizations() {
                       ) : (
                         <Badge tone="danger">Suspended</Badge>
                       )}
+                      {o.deletion_due_at && (
+                        <Badge tone="danger">Deletion scheduled</Badge>
+                      )}
                       {o.integration_enabled && (
                         <Badge tone="accent">Automation on</Badge>
                       )}

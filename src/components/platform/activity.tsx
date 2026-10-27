@@ -11,20 +11,27 @@ const LABELS: Record<string, string> = {
   "platform.login": "Signed in",
   "platform.logout": "Signed out",
   "platform.login_failed": "Wrong password",
-  "platform.login_rejected": "Sign-in refused (locked or deactivated)",
+  "platform.login_rejected":
+    "Sign-in refused (locked, deactivated or not a company email)",
   "platform.mfa_failed": "Wrong two-step code",
   "platform.mfa_enabled": "Set up two-step sign-in",
   "platform.recovery_code_used": "Used a recovery code",
   "platform.account_locked": "Account locked after failed attempts",
   "platform.password_changed": "Changed their password",
+  "platform.recovery_codes_replaced": "Made new recovery codes",
+  "platform.other_sessions_ended": "Signed out everywhere else",
   "platform.admin_created": "Added a platform admin",
   "platform.admin_activated": "Reactivated a platform admin",
   "platform.admin_deactivated": "Deactivated a platform admin",
   "platform.admin_password_reset": "Reset a platform admin's password",
   "platform.admin_mfa_reset": "Reset a platform admin's two-step sign-in",
+  "platform.admin_role_changed": "Changed a platform admin's role",
   "platform.org_created": "Created the organization",
   "platform.org_suspended": "Suspended the organization",
   "platform.org_activated": "Reactivated the organization",
+  "platform.org_deletion_scheduled": "Scheduled the organization's deletion",
+  "platform.org_deletion_cancelled": "Cancelled the organization's deletion",
+  "platform.org_deleted": "Deleted the organization",
   "platform.org_integration_enabled": "Switched automation on",
   "platform.org_integration_disabled": "Switched automation off",
   "platform.org_notifications_updated": "Changed notification emails",
@@ -39,8 +46,9 @@ export function describeAction(a: PlatformAuditEntry): string {
   const label = LABELS[a.action] ?? a.action;
   const details = (a.details ?? {}) as Record<string, unknown>;
   const who = typeof details.email === "string" ? ` (${details.email})` : "";
+  const role = typeof details.to === "string" ? ` → ${details.to}` : "";
   const org = a.target_org_slug ? ` · ${a.target_org_slug}` : "";
-  return `${label}${who}${org}`;
+  return `${label}${who}${role}${org}`;
 }
 
 export function PlatformActivity() {
