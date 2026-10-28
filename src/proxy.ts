@@ -7,7 +7,7 @@ import { NextResponse, type NextRequest } from "next/server";
  * API routes are excluded (they answer JSON and enforce auth themselves).
  */
 const SESSION_COOKIES = ["__Host-lf_session", "lf_session"];
-const PUBLIC_PATHS = new Set(["/login"]);
+const PUBLIC_PATHS = new Set(["/login", "/privacy"]);
 const PLATFORM_COOKIES = ["__Host-lf_platform", "lf_platform"];
 
 function originOf(value: string | undefined): string | null {
