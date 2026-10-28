@@ -23,6 +23,8 @@ export const GRANTABLE_KEY_SCOPES = [
   "research:process",
   "outreach:process",
   "whatsapp:send",
+  "email:process",
+  "email:send",
 ] as const satisfies readonly Permission[];
 
 /** Plain-language description of each grantable scope, for the key picker. */
@@ -53,6 +55,10 @@ export const SCOPE_HELP: Record<(typeof GRANTABLE_KEY_SCOPES)[number], string> =
       "Write and send first messages to new leads (first-message workflows)",
     "whatsapp:send":
       "Send WhatsApp messages from the company's number (messaging workflows)",
+    "email:process":
+      "Collect received emails and report what became of them (email intake workflow)",
+    "email:send":
+      "Send emails from the company's connected mailbox (messaging workflows)",
   };
 
 /** Permission checks always go through the live `permissions` array, never the role string. */

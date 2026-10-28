@@ -15,7 +15,7 @@ export interface paths {
          * Health
          * @description Liveness: the process is up. Says nothing about its dependencies.
          */
-        get: operations["health_health_get"];
+        get: operations["health_health_head"];
         put?: never;
         post?: never;
         delete?: never;
@@ -24,7 +24,7 @@ export interface paths {
          * Health
          * @description Liveness: the process is up. Says nothing about its dependencies.
          */
-        head: operations["health_health_get"];
+        head: operations["health_health_head"];
         patch?: never;
         trace?: never;
     };
@@ -40,7 +40,7 @@ export interface paths {
          * @description Readiness: can this instance actually serve traffic (database, Redis)?
          *     A load balancer should route on this, not on /health.
          */
-        get: operations["ready_ready_get"];
+        get: operations["ready_ready_head"];
         put?: never;
         post?: never;
         delete?: never;
@@ -50,7 +50,7 @@ export interface paths {
          * @description Readiness: can this instance actually serve traffic (database, Redis)?
          *     A load balancer should route on this, not on /health.
          */
-        head: operations["ready_ready_get"];
+        head: operations["ready_ready_head"];
         patch?: never;
         trace?: never;
     };
@@ -2317,6 +2317,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/integrations/email/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sync Mailboxes
+         * @description The catch-up, called by the automation every few minutes: syncs every
+         *     connected mailbox no push has synced lately, renews Gmail watches daily, and
+         *     lists mailboxes a person must look at (e.g. to reconnect).
+         */
+        post: operations["sync_mailboxes_integrations_email_sync_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/integrations/email/pending": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Pending Emails
+         * @description Received emails waiting for the intake workflow, across organizations:
+         *     oldest first, at most `per_org` per organization. Ids only: the workflow
+         *     claims each with POST /email/inbound/{id}/claim and X-Leadflow-Org.
+         */
+        get: operations["pending_emails_integrations_email_pending_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/whatsapp/messages": {
         parameters: {
             query?: never;
@@ -2333,6 +2377,156 @@ export interface paths {
         put?: never;
         /** Send Message */
         post: operations["send_message_whatsapp_messages_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/email/mailboxes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Mailboxes */
+        get: operations["list_mailboxes_email_mailboxes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/email/mailboxes/google/authorize": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Authorize Google
+         * @description Where to send the admin's browser: Google's consent screen. Google sends
+         *     it back to /email/oauth/google/callback, which finishes the connection.
+         */
+        post: operations["authorize_google_email_mailboxes_google_authorize_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/email/mailboxes/{mailbox_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Disconnect Mailbox */
+        delete: operations["disconnect_mailbox_email_mailboxes__mailbox_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Mailbox */
+        patch: operations["update_mailbox_email_mailboxes__mailbox_id__patch"];
+        trace?: never;
+    };
+    "/email/inbound/{inbound_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Inbound */
+        get: operations["get_inbound_email_inbound__inbound_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/email/inbound/{inbound_id}/claim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Claim Inbound
+         * @description Takes a waiting email (-> `processing`) and returns it in full. `409` if
+         *     someone else has it; an unfinished claim is handed out again after
+         *     CAPTURE_PROCESSING_LEASE_MINUTES, up to INBOUND_EMAIL_MAX_ATTEMPTS times.
+         */
+        post: operations["claim_inbound_email_inbound__inbound_id__claim_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/email/inbound/{inbound_id}/result": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Report Inbound */
+        post: operations["report_inbound_email_inbound__inbound_id__result_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/email/inbound/{inbound_id}/fail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Fail Inbound
+         * @description The workflow could not finish it: handed out again, until
+         *     INBOUND_EMAIL_MAX_ATTEMPTS, then left `failed`.
+         */
+        post: operations["fail_inbound_email_inbound__inbound_id__fail_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/email/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send Email */
+        post: operations["send_email_email_messages_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3121,6 +3315,11 @@ export interface components {
             /** Ip Address */
             ip_address: string | null;
         };
+        /** AuthorizationUrl */
+        AuthorizationUrl: {
+            /** Authorization Url */
+            authorization_url: string;
+        };
         /** Body_upload_card_back_captures__capture_id__card_back_post */
         Body_upload_card_back_captures__capture_id__card_back_post: {
             /**
@@ -3888,6 +4087,69 @@ export interface components {
             is_likely_duplicate: boolean;
         };
         /**
+         * EmailSend
+         * @description One email from the organization's sending mailbox.
+         *
+         *     With `lead_id`, it is recorded on the lead as an outbound message in the
+         *     same step. With `reply_in_thread`, it goes as a reply in the recipient's
+         *     latest email thread with this mailbox (when there is one); `subject` may
+         *     then be left out ("Re: <their subject>").
+         */
+        EmailSend: {
+            /**
+             * To
+             * Format: email
+             */
+            to: string;
+            /** Subject */
+            subject?: string | null;
+            /** Text */
+            text: string;
+            /** Html */
+            html?: string | null;
+            /** Lead Id */
+            lead_id?: string | null;
+            /**
+             * Reply In Thread
+             * @default false
+             */
+            reply_in_thread: boolean;
+            /** Log Content */
+            log_content?: string | null;
+        };
+        /** EmailSent */
+        EmailSent: {
+            /** Provider Message Id */
+            provider_message_id: string;
+            /** Thread Id */
+            thread_id: string | null;
+            /** From Address */
+            from_address: string;
+            /** To */
+            to: string;
+            /** Subject */
+            subject: string;
+            /** Lead Id */
+            lead_id?: string | null;
+            /** Touchpoint Id */
+            touchpoint_id?: string | null;
+        };
+        /** EmailSyncSummary */
+        EmailSyncSummary: {
+            /** Mailboxes */
+            mailboxes: number;
+            /** Synced */
+            synced: number;
+            /** Queued */
+            queued: number;
+            /** Watches Renewed */
+            watches_renewed: number;
+            /** Needs Attention */
+            needs_attention: {
+                [key: string]: unknown;
+            }[];
+        };
+        /**
          * EventBrief
          * @description Enough to put the exhibition's name at the top of a screen.
          */
@@ -4261,6 +4523,131 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+        };
+        /** InboundEmailFailure */
+        InboundEmailFailure: {
+            /** Error */
+            error: string;
+        };
+        /**
+         * InboundEmailRead
+         * @description A received email's queue entry, without its content.
+         */
+        InboundEmailRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Mailbox Id
+             * Format: uuid
+             */
+            mailbox_id: string;
+            /** From Name */
+            from_name: string | null;
+            /** From Address */
+            from_address: string | null;
+            /** Subject */
+            subject: string | null;
+            /** Received At */
+            received_at: string | null;
+            /** Status */
+            status: string;
+            /** Attempts */
+            attempts: number;
+            /** Lead Id */
+            lead_id: string | null;
+            /** Outcome Reason */
+            outcome_reason: string | null;
+            /** Error */
+            error: string | null;
+            /** Completed At */
+            completed_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /**
+         * InboundEmailResult
+         * @description `ingested`: it became (or joined) `lead_id`. `review`: a person was asked
+         *     to look at it. `skipped`: not an enquiry (its content is dropped).
+         */
+        InboundEmailResult: {
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "ingested" | "review" | "skipped";
+            /** Lead Id */
+            lead_id?: string | null;
+            /** Reason */
+            reason?: string | null;
+        };
+        /**
+         * InboundEmailWork
+         * @description What the workflow gets when it claims a received email.
+         */
+        InboundEmailWork: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Mailbox Id
+             * Format: uuid
+             */
+            mailbox_id: string;
+            /** From Name */
+            from_name: string | null;
+            /** From Address */
+            from_address: string | null;
+            /** Subject */
+            subject: string | null;
+            /** Received At */
+            received_at: string | null;
+            /** Status */
+            status: string;
+            /** Attempts */
+            attempts: number;
+            /** Lead Id */
+            lead_id: string | null;
+            /** Outcome Reason */
+            outcome_reason: string | null;
+            /** Error */
+            error: string | null;
+            /** Completed At */
+            completed_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Mailbox Address */
+            mailbox_address: string;
+            /** Provider Message Id */
+            provider_message_id: string;
+            /** Thread Id */
+            thread_id: string | null;
+            /** Rfc Message Id */
+            rfc_message_id: string | null;
+            /** In Reply To */
+            in_reply_to: string | null;
+            /** To Addresses */
+            to_addresses: string[];
+            /** Cc Addresses */
+            cc_addresses: string[];
+            /** Body Text */
+            body_text: string | null;
+            /** Body Truncated */
+            body_truncated: boolean;
+            /** Attachments */
+            attachments: {
+                [key: string]: unknown;
+            }[] | null;
         };
         /** IngestTouchpoint */
         IngestTouchpoint: {
@@ -4943,6 +5330,64 @@ export interface components {
             /** Password */
             password: string;
         };
+        /**
+         * MailboxRead
+         * @description A connected mailbox, without its credential.
+         */
+        MailboxRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Provider */
+            provider: string;
+            /** Email Address */
+            email_address: string;
+            /** Status */
+            status: string;
+            /** Receive Enabled */
+            receive_enabled: boolean;
+            /** Is Default Sender */
+            is_default_sender: boolean;
+            /** Granted Scopes */
+            granted_scopes: string[];
+            /** Skip Categories */
+            skip_categories: string[];
+            /** Last Synced At */
+            last_synced_at: string | null;
+            /** Last Error */
+            last_error: string | null;
+            /** Last Error At */
+            last_error_at: string | null;
+            /** Watch Expires At */
+            watch_expires_at: string | null;
+            /** Connected By User Id */
+            connected_by_user_id: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Can Receive */
+            readonly can_receive: boolean;
+            /** Can Send */
+            readonly can_send: boolean;
+        };
+        /** MailboxUpdate */
+        MailboxUpdate: {
+            /** Receive Enabled */
+            receive_enabled?: boolean | null;
+            /** Is Default Sender */
+            is_default_sender?: boolean | null;
+            /** Skip Categories */
+            skip_categories?: ("promotions" | "social" | "forums" | "updates")[] | null;
+        };
         /** MeOrganization */
         MeOrganization: {
             /**
@@ -5342,11 +5787,21 @@ export interface components {
          * @enum {string}
          */
         OutreachStatus: "requested" | "drafting" | "draft_ready" | "approved" | "sending" | "sent" | "failed" | "cancelled";
+        /** PendingEmail */
+        PendingEmail: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Org */
+            org: string;
+        };
         /**
          * Permission
          * @enum {string}
          */
-        Permission: "leads:read" | "leads:write" | "leads:ingest" | "leads:sweep" | "stats:read" | "touchpoints:write" | "quotations:read" | "quotations:write" | "quotations:approve" | "samples:read" | "samples:write" | "accounts:read" | "accounts:write" | "accounts:delete" | "contacts:read" | "contacts:write" | "contacts:delete" | "catalog:read" | "catalog:write" | "events:read" | "events:write" | "cadences:read" | "cadences:write" | "users:read" | "users:write" | "keys:manage" | "audit:read" | "org:read" | "org:write" | "captures:read" | "captures:write" | "captures:process" | "research:process" | "outreach:process" | "whatsapp:send";
+        Permission: "leads:read" | "leads:write" | "leads:ingest" | "leads:sweep" | "stats:read" | "touchpoints:write" | "quotations:read" | "quotations:write" | "quotations:approve" | "samples:read" | "samples:write" | "accounts:read" | "accounts:write" | "accounts:delete" | "contacts:read" | "contacts:write" | "contacts:delete" | "catalog:read" | "catalog:write" | "events:read" | "events:write" | "cadences:read" | "cadences:write" | "users:read" | "users:write" | "keys:manage" | "audit:read" | "org:read" | "org:write" | "captures:read" | "captures:write" | "captures:process" | "research:process" | "outreach:process" | "whatsapp:send" | "email:process" | "email:send";
         /** PlatformAdminCreate */
         PlatformAdminCreate: {
             /** Code */
@@ -6469,7 +6924,7 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    health_health_get: {
+    health_health_head: {
         parameters: {
             query?: never;
             header?: never;
@@ -6489,7 +6944,7 @@ export interface operations {
             };
         };
     };
-    health_health_get: {
+    health_health_head: {
         parameters: {
             query?: never;
             header?: never;
@@ -6509,7 +6964,7 @@ export interface operations {
             };
         };
     };
-    ready_ready_get: {
+    ready_ready_head: {
         parameters: {
             query?: never;
             header?: never;
@@ -6529,7 +6984,7 @@ export interface operations {
             };
         };
     };
-    ready_ready_get: {
+    ready_ready_head: {
         parameters: {
             query?: never;
             header?: never;
@@ -11769,6 +12224,58 @@ export interface operations {
             };
         };
     };
+    sync_mailboxes_integrations_email_sync_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmailSyncSummary"];
+                };
+            };
+        };
+    };
+    pending_emails_integrations_email_pending_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                per_org?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PendingEmail"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     find_message_whatsapp_messages_get: {
         parameters: {
             query: {
@@ -11822,6 +12329,289 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WhatsAppSent"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Failed Dependency */
+            424: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_mailboxes_email_mailboxes_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MailboxRead"][];
+                };
+            };
+        };
+    };
+    authorize_google_email_mailboxes_google_authorize_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthorizationUrl"];
+                };
+            };
+        };
+    };
+    disconnect_mailbox_email_mailboxes__mailbox_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                mailbox_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_mailbox_email_mailboxes__mailbox_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                mailbox_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MailboxUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MailboxRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_inbound_email_inbound__inbound_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                inbound_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InboundEmailRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    claim_inbound_email_inbound__inbound_id__claim_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                inbound_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InboundEmailWork"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    report_inbound_email_inbound__inbound_id__result_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                inbound_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InboundEmailResult"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InboundEmailRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fail_inbound_email_inbound__inbound_id__fail_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                inbound_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InboundEmailFailure"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InboundEmailRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    send_email_email_messages_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmailSend"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmailSent"];
                 };
             };
             /** @description Conflict */

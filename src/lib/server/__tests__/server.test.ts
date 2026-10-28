@@ -35,7 +35,12 @@ describe("gateway allow-list", () => {
       "/leads/3f2c1e9a-1111-4222-8333-444455556666/research",
     ],
     [
-      ["leads", "3f2c1e9a-1111-4222-8333-444455556666", "notes", "3f2c1e9a-1111-4222-8333-444455556667"],
+      [
+        "leads",
+        "3f2c1e9a-1111-4222-8333-444455556666",
+        "notes",
+        "3f2c1e9a-1111-4222-8333-444455556667",
+      ],
       "/leads/3f2c1e9a-1111-4222-8333-444455556666/notes/3f2c1e9a-1111-4222-8333-444455556667",
     ],
     [
@@ -74,6 +79,15 @@ describe("gateway allow-list", () => {
       ["leads", "3f2c1e9a-1111-4222-8333-444455556666", "handoff"],
       "/leads/3f2c1e9a-1111-4222-8333-444455556666/handoff",
     ],
+    [["email", "mailboxes"], "/email/mailboxes"],
+    [
+      ["email", "mailboxes", "google", "authorize"],
+      "/email/mailboxes/google/authorize",
+    ],
+    [
+      ["email", "mailboxes", "3f2c1e9a-1111-4222-8333-444455556666"],
+      "/email/mailboxes/3f2c1e9a-1111-4222-8333-444455556666",
+    ],
   ])("allows %j", (segs, target) => expect(resolveTarget(segs)).toBe(target));
 
   it.each([
@@ -84,7 +98,13 @@ describe("gateway allow-list", () => {
     [["captures", "3f2c1e9a-1111-4222-8333-444455556666", "claim"]],
     [["captures", "3f2c1e9a-1111-4222-8333-444455556666", "extraction"]],
     [["captures", "3f2c1e9a-1111-4222-8333-444455556666", "fail"]],
-    [["captures", "3f2c1e9a-1111-4222-8333-444455556666", "extraction-context"]],
+    [
+      [
+        "captures",
+        "3f2c1e9a-1111-4222-8333-444455556666",
+        "extraction-context",
+      ],
+    ],
     // n8n's research queue is not a browser resource; people use /leads/{id}/research.
     [["research"]],
     [["research", "3f2c1e9a-1111-4222-8333-444455556666", "claim"]],
@@ -97,6 +117,16 @@ describe("gateway allow-list", () => {
     [["outreach", "3f2c1e9a-1111-4222-8333-444455556666", "sent"]],
     [["outreach", "3f2c1e9a-1111-4222-8333-444455556666", "fail"]],
     [["outreach", "3f2c1e9a-1111-4222-8333-444455556666", "approve", "x"]],
+    // Email: the received-email queue and sending are n8n's; Google calls the OAuth callback and push itself.
+    [["email"]],
+    [["email", "messages"]],
+    [["email", "inbound", "3f2c1e9a-1111-4222-8333-444455556666"]],
+    [["email", "inbound", "3f2c1e9a-1111-4222-8333-444455556666", "claim"]],
+    [["email", "oauth", "google", "callback"]],
+    [["email", "push", "google"]],
+    [["email", "mailboxes", "google"]],
+    [["email", "mailboxes", "not-a-uuid"]],
+    [["email", "mailboxes", "3f2c1e9a-1111-4222-8333-444455556666", "x"]],
     [["auth", "refresh"]],
     [["auth", "logout"]],
     [["health"]],

@@ -48,6 +48,21 @@ const OUTREACH_ACTIONS = new Set([
 /** /auth/* endpoints the browser may call there (login/refresh/logout have dedicated routes). */
 const AUTH_ALLOWED = new Set(["me", "change-password"]);
 
+/**
+ * Settings → Email: list mailboxes, start a Google connection, change or disconnect one. The received-email
+ * queue and sending (`/email/inbound/*`, `/email/messages`) are n8n's; Google itself calls the OAuth callback.
+ */
+function emailTarget(segments: string[]): string | null {
+  const [, a, b, c] = segments;
+  if (a !== "mailboxes") return null;
+  const n = segments.length;
+  const ok =
+    n === 2 ||
+    (n === 3 && UUID.test(b!)) ||
+    (n === 4 && b === "google" && c === "authorize");
+  return ok ? `/${segments.join("/")}` : null;
+}
+
 export function resolveTarget(segments: string[]): string | null {
   if (segments.length === 0 || segments.length > 6) return null;
   if (!segments.every((s) => SEGMENT.test(s))) return null; // blocks "..", encoded slashes, etc.
@@ -61,6 +76,7 @@ export function resolveTarget(segments: string[]): string | null {
       (segments.length === 3 && OUTREACH_ACTIONS.has(segments[2]!))
       ? `/${segments.join("/")}`
       : null;
+  if (head === "email") return emailTarget(segments);
   if (segments.some((s) => PROCESS_ONLY.has(s))) return null;
   return RESOURCES.has(head!) ? `/${segments.join("/")}` : null;
 }

@@ -30,6 +30,7 @@ export type UserBrief = S["UserBrief"];
 export type ApiKey = S["ApiKeyRead"];
 export type ApiKeyCreated = S["ApiKeyCreated"];
 export type Organization = S["OrganizationRead"];
+export type Mailbox = S["MailboxRead"];
 export type AuditLog = S["AuditLogRead"];
 export type IngestResult = S["LeadIngestResponse"];
 export type BulkIngestResult = S["BulkIngestResponse"];

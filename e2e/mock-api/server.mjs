@@ -372,6 +372,33 @@ const org = {
   auto_research_new_leads: false,
   first_touch_auto_send: false,
 };
+const SCOPES = [
+  "https://www.googleapis.com/auth/gmail.readonly",
+  "https://www.googleapis.com/auth/gmail.send",
+];
+const mailboxView = (address, extra = {}) => ({
+  id: uid(),
+  provider: "gmail",
+  email_address: address,
+  status: "active",
+  receive_enabled: true,
+  is_default_sender: false,
+  granted_scopes: SCOPES,
+  skip_categories: ["forums", "promotions", "social"],
+  last_synced_at: ago(0.1),
+  last_error: null,
+  last_error_at: null,
+  watch_expires_at: null,
+  connected_by_user_id: ME.id,
+  created_at: ago(48),
+  updated_at: ago(1),
+  can_receive: true,
+  can_send: true,
+  ...extra,
+});
+/** Connected mailboxes (Settings → Email). Google's consent screen is skipped: authorize sends the browser straight back. */
+const mailboxes = [mailboxView("sales@acme-exports.example.com", { is_default_sender: true })];
+const APP_URL = process.env.MOCK_APP_URL ?? "http://127.0.0.1:3100";
 const productsOf = (lead) =>
   (leadProducts.get(lead.id) ?? []).map((lp, i) => {
     const p = products.find((x) => x.id === lp.product_id);
@@ -1980,6 +2007,35 @@ ${run.email_body}`,
       ],
       url,
     );
+  if (path === "/email/mailboxes" && method === "GET")
+    return json(res, 200, mailboxes);
+  if (path === "/email/mailboxes/google/authorize" && method === "POST") {
+    const address = `enquiries${mailboxes.length}@acme-exports.example.com`;
+    mailboxes.push(mailboxView(address, { created_at: now(), last_synced_at: null }));
+    return json(res, 200, {
+      authorization_url: `${APP_URL}/settings/email?connected=${encodeURIComponent(address)}`,
+    });
+  }
+  if ((m = /^\/email\/mailboxes\/([^/]+)$/.exec(path))) {
+    const i = mailboxes.findIndex((x) => x.id === m[1]);
+    if (i < 0) return json(res, 404, { detail: "Not found" });
+    if (method === "DELETE") {
+      const [gone] = mailboxes.splice(i, 1);
+      if (gone.is_default_sender && mailboxes[0]) mailboxes[0].is_default_sender = true;
+      return json(res, 204);
+    }
+    if (method === "PATCH") {
+      const b = (await readBody(req)) ?? {};
+      const bad = strict("MailboxUpdate", b);
+      if (bad) return json(res, 422, bad);
+      const box = mailboxes[i];
+      if (b.is_default_sender) for (const x of mailboxes) x.is_default_sender = x === box;
+      if (b.receive_enabled != null) box.receive_enabled = b.receive_enabled;
+      if (b.skip_categories) box.skip_categories = [...new Set(b.skip_categories)].sort();
+      box.updated_at = now();
+      return json(res, 200, box);
+    }
+  }
   if (path === "/service-api-keys") return list(res, [], url);
 
   return json(res, 404, { detail: "Not found" });

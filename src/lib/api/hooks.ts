@@ -41,6 +41,7 @@ import type {
   LibraryItem,
   MatchResult,
   Me,
+  Mailbox,
   Organization,
   Outreach,
   Page,
@@ -206,7 +207,8 @@ export function useLeadContext(id: string) {
     queryFn: ({ signal }) =>
       api<LeadContext>(`/leads/${id}/context`, { signal }),
     refetchInterval: (q) =>
-      researching(q.state.data?.research) || outreachBusy(q.state.data?.outreach)
+      researching(q.state.data?.research) ||
+      outreachBusy(q.state.data?.outreach)
         ? 15_000
         : false,
   });
@@ -635,6 +637,63 @@ export function useUpdateOrganization() {
   });
 }
 
+/* ── Email (Settings → Email) ───────────────────────────────────────────── */
+export function useMailboxes() {
+  return useQuery({
+    queryKey: ["email", "mailboxes"],
+    queryFn: ({ signal }) => api<Mailbox[]>("/email/mailboxes", { signal }),
+  });
+}
+
+/** Asks the API for Google's consent screen and sends the browser there; Google brings it back to this page. */
+export function useConnectGmail() {
+  return useMutation({
+    mutationFn: () =>
+      api<{ authorization_url: string }>("/email/mailboxes/google/authorize", {
+        method: "POST",
+      }),
+    onSuccess: ({ authorization_url }) => {
+      window.location.assign(authorization_url);
+    },
+  });
+}
+
+/** Ticks show at once (they are plain on/off settings); a refused change is put back when the list reloads. */
+export function useUpdateMailbox() {
+  const qc = useQueryClient();
+  const key = ["email", "mailboxes"];
+  return useMutation({
+    mutationFn: ({ id, ...body }: { id: string } & Record<string, unknown>) =>
+      api<Mailbox>(`/email/mailboxes/${id}`, { method: "PATCH", body }),
+    onMutate: async ({ id, ...body }) => {
+      await qc.cancelQueries({ queryKey: key });
+      qc.setQueryData<Mailbox[]>(key, (rows) =>
+        rows?.map((m) =>
+          m.id === id
+            ? { ...m, ...body }
+            : body.is_default_sender
+              ? { ...m, is_default_sender: false }
+              : m,
+        ),
+      );
+    },
+    onSuccess: () => toast.success("Mailbox updated"),
+    onSettled: () => void qc.invalidateQueries({ queryKey: key }),
+  });
+}
+
+export function useDisconnectMailbox() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      api<void>(`/email/mailboxes/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["email", "mailboxes"] });
+      toast.success("Mailbox disconnected");
+    },
+  });
+}
+
 export function useAuditLogs(query: Query) {
   return useQuery({
     queryKey: ["audit-logs", query],
@@ -809,10 +868,19 @@ export function useRegions() {
 }
 
 /* ── Lead page: products, notes, research ───────────────────────────────── */
-export function useSetLeadProducts(leadId: string, opts: MutationOpts<LeadProduct[]> = {}) {
+export function useSetLeadProducts(
+  leadId: string,
+  opts: MutationOpts<LeadProduct[]> = {},
+) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (products: { product_id: string; quantity?: string | null; note?: string | null }[]) =>
+    mutationFn: (
+      products: {
+        product_id: string;
+        quantity?: string | null;
+        note?: string | null;
+      }[],
+    ) =>
       api<LeadProduct[]>(`/leads/${leadId}/products`, {
         method: "PUT",
         body: { products },
@@ -838,7 +906,13 @@ export function useLeadNoteMutations(leadId: string) {
       onSuccess: done,
     }),
     update: useMutation({
-      mutationFn: ({ id, body }: { id: string; body: Record<string, unknown> }) =>
+      mutationFn: ({
+        id,
+        body,
+      }: {
+        id: string;
+        body: Record<string, unknown>;
+      }) =>
         api<LeadNote>(`/leads/${leadId}/notes/${id}`, {
           method: "PATCH",
           body,
@@ -913,20 +987,35 @@ export function useOutreachActions(leadId: string) {
       onSuccess: done,
     }),
     approve: useMutation({
-      mutationFn: ({ id, body }: { id: string; body: OutreachText & { channel: "whatsapp" | "email" } }) =>
-        post(id, "approve", body),
+      mutationFn: ({
+        id,
+        body,
+      }: {
+        id: string;
+        body: OutreachText & { channel: "whatsapp" | "email" };
+      }) => post(id, "approve", body),
       meta: { handled: true },
       onSuccess: done,
     }),
     markSent: useMutation({
-      mutationFn: ({ id, body }: { id: string; body: OutreachText & { channel: "whatsapp" | "email" } }) =>
-        post(id, "mark-sent", body),
+      mutationFn: ({
+        id,
+        body,
+      }: {
+        id: string;
+        body: OutreachText & { channel: "whatsapp" | "email" };
+      }) => post(id, "mark-sent", body),
       meta: { handled: true },
       onSuccess: done,
     }),
     redraft: useMutation({
-      mutationFn: ({ id, instructions }: { id: string; instructions?: string }) =>
-        post(id, "redraft", instructions ? { instructions } : {}),
+      mutationFn: ({
+        id,
+        instructions,
+      }: {
+        id: string;
+        instructions?: string;
+      }) => post(id, "redraft", instructions ? { instructions } : {}),
       onSuccess: done,
     }),
     retry: useMutation({
@@ -945,7 +1034,10 @@ export function useProductMatch(q: string, enabled = true) {
   return useQuery({
     queryKey: ["products", "match", q],
     queryFn: ({ signal }) =>
-      api<ProductMatch[]>("/products/match", { query: { q, limit: 5 }, signal }),
+      api<ProductMatch[]>("/products/match", {
+        query: { q, limit: 5 },
+        signal,
+      }),
     enabled: enabled && q.trim().length >= 2,
     staleTime: 60_000,
     retry: false,
@@ -990,7 +1082,10 @@ export function useEventSummary(id: string, enabled = true) {
 }
 
 /** Replaces the whole team of a show (`PUT /events/{id}/members`). */
-export function useSetEventMembers(id: string, opts: MutationOpts<EventRecord> = {}) {
+export function useSetEventMembers(
+  id: string,
+  opts: MutationOpts<EventRecord> = {},
+) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (members: { user_id: string; role?: string | null }[]) =>

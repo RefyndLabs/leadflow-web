@@ -7,6 +7,7 @@ import {
   Inbox,
   KeyRound,
   LayoutDashboard,
+  Mail,
   Package,
   ScanLine,
   Settings2,
@@ -112,6 +113,12 @@ export const NAV: NavGroup[] = [
         label: "API keys",
         icon: KeyRound,
         permission: "keys:manage",
+      },
+      {
+        href: "/settings/email",
+        label: "Email",
+        icon: Mail,
+        permission: "org:read",
       },
       {
         href: "/settings/organization",

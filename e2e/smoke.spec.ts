@@ -22,6 +22,7 @@ const ROUTES = [
   "/captures",
   "/settings/team",
   "/settings/api-keys",
+  "/settings/email",
   "/settings/organization",
   "/settings/audit",
   "/settings/profile",
