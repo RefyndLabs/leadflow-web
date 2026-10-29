@@ -474,8 +474,10 @@ function WhatsAppCard({ org }: { org: PlatformOrgDetail }) {
             </span>
           )}
         </p>
+        {/* Not a login form: keep password managers from filling in the browser's saved login. */}
         <form
           noValidate
+          autoComplete="off"
           className="space-y-4"
           onSubmit={(e) => {
             e.preventDefault();
@@ -492,7 +494,11 @@ function WhatsAppCard({ org }: { org: PlatformOrgDetail }) {
             hint="The number Meta shows under WhatsApp → API setup (digits only), not the phone number."
           >
             <Input
+              name="whatsapp-phone-number-id"
               inputMode="numeric"
+              autoComplete="off"
+              data-1p-ignore
+              data-lpignore="true"
               maxLength={30}
               value={phoneId}
               onChange={(e) => setPhoneId(e.target.value)}
@@ -504,7 +510,10 @@ function WhatsAppCard({ org }: { org: PlatformOrgDetail }) {
             hint="A permanent system-user token (starts with EAA). Stored encrypted and never shown again."
           >
             <PasswordInput
-              autoComplete="off"
+              name="whatsapp-access-token"
+              autoComplete="new-password"
+              data-1p-ignore
+              data-lpignore="true"
               maxLength={1000}
               value={token}
               onChange={(e) => setToken(e.target.value)}
@@ -541,6 +550,64 @@ function WhatsAppCard({ org }: { org: PlatformOrgDetail }) {
             </Button>
           </div>
         </form>
+      </CardBody>
+    </Card>
+  );
+}
+
+function EmailCard({ org }: { org: PlatformOrgDetail }) {
+  // Older API builds don't send the list yet.
+  const mailboxes = org.mailboxes ?? [];
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Email</CardTitle>
+      </CardHeader>
+      <CardBody className="space-y-3 text-[14px]">
+        {mailboxes.length === 0 ? (
+          <p>
+            <Badge>Not connected</Badge>{" "}
+            <span className="text-muted">
+              The organization&apos;s admin connects their Gmail in Settings →
+              Email.
+            </span>
+          </p>
+        ) : (
+          <ul className="space-y-3">
+            {mailboxes.map((m) => (
+              <li key={m.email_address}>
+                <p className="flex flex-wrap items-center gap-2">
+                  <span className="break-all font-medium">
+                    {m.email_address}
+                  </span>
+                  {m.status === "needs_reconnect" ? (
+                    <Badge tone="warning" dot>
+                      Needs reconnecting
+                    </Badge>
+                  ) : (
+                    <Badge tone="success" dot>
+                      Connected
+                    </Badge>
+                  )}
+                  {m.is_default_sender && (
+                    <Badge tone="accent">Sends from here</Badge>
+                  )}
+                  {!m.receive_enabled && <Badge>Not receiving</Badge>}
+                </p>
+                <p className="text-[13px] text-muted">
+                  Gmail ·{" "}
+                  {m.last_synced_at
+                    ? `last checked ${formatRelative(m.last_synced_at)}`
+                    : "not checked yet"}
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
+        <p className="text-[13px] text-muted">
+          Only the organization can connect or disconnect a mailbox. Its access
+          is stored encrypted and never shown here.
+        </p>
       </CardBody>
     </Card>
   );
@@ -701,6 +768,7 @@ export function PlatformOrganization({ slug }: { slug: string }) {
         <AutomationCard org={org} />
         <NotificationsCard key={`n-${org.id}`} org={org} />
         <WhatsAppCard key={`w-${org.id}`} org={org} />
+        <EmailCard org={org} />
         <UsersCard org={org} />
         <RecentActivity slug={org.slug} />
         {isOwner && <DeletionCard org={org} />}

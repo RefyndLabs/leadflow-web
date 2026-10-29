@@ -50,6 +50,7 @@ const org = (name, slug, extra = {}) => ({
   deletion_due_at: null,
   deletion_scheduled_at: null,
   deletion_scheduled_by: null,
+  mailboxes: [],
   ...extra,
 });
 const orgs = [
@@ -58,6 +59,16 @@ const orgs = [
     users_active: 4,
     leads_total: 12,
     integration_enabled: true,
+    mailboxes: [
+      {
+        email_address: "sales@acme-exports.example.com",
+        provider: "gmail",
+        status: "active",
+        receive_enabled: true,
+        is_default_sender: true,
+        last_synced_at: now(),
+      },
+    ],
   }),
 ];
 const users = new Map([

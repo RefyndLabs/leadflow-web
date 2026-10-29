@@ -5977,6 +5977,24 @@ export interface components {
             /** Password */
             password: string;
         };
+        /**
+         * PlatformMailbox
+         * @description A connected mailbox as support sees it: the address and its state, never the credential.
+         */
+        PlatformMailbox: {
+            /** Email Address */
+            email_address: string;
+            /** Provider */
+            provider: string;
+            /** Status */
+            status: string;
+            /** Receive Enabled */
+            receive_enabled: boolean;
+            /** Is Default Sender */
+            is_default_sender: boolean;
+            /** Last Synced At */
+            last_synced_at: string | null;
+        };
         /** PlatformMe */
         PlatformMe: {
             /**
@@ -6088,6 +6106,8 @@ export interface components {
             deletion_scheduled_at: string | null;
             /** Deletion Scheduled By */
             deletion_scheduled_by: string | null;
+            /** Mailboxes */
+            mailboxes: components["schemas"]["PlatformMailbox"][];
         };
         /** PlatformOrgSummary */
         PlatformOrgSummary: {

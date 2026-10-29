@@ -132,6 +132,26 @@ test.describe("platform console", () => {
     await expect(page.getByText("Suspended the organization")).toBeVisible();
   });
 
+  test("organization page: the connected mailbox, and WhatsApp fields a password manager won't fill", async ({
+    page,
+  }) => {
+    await platformSignIn(page);
+    await page.goto("/platform/organizations/acme-exports");
+    await expect(
+      page.getByText("sales@acme-exports.example.com"),
+    ).toBeVisible();
+    await expect(page.getByText("Sends from here")).toBeVisible();
+    await expect(page.getByLabel("Access token")).toHaveAttribute(
+      "autocomplete",
+      "new-password",
+    );
+    await expect(page.getByLabel("Phone number ID")).toHaveValue("");
+    await expect(page.getByLabel("Access token")).toHaveValue("");
+
+    await page.goto("/platform/organizations/beta-foods");
+    await expect(page.getByText("Not connected")).toBeVisible();
+  });
+
   test("deleting: schedule with the slug and a fresh code, cancel, then delete after the wait", async ({
     page,
   }) => {
